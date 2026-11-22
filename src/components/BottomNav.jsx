@@ -108,7 +108,7 @@ export default function BottomNav({
             >
               <CalendarDays
                 size={22}
-                style={{ fill: act ? "currentColor" : "none" }}
+                style={{ fill: "none" }}
               />
               {act && <span className="despensa-bottomnav-dot" />}
             </button>
@@ -126,7 +126,7 @@ export default function BottomNav({
             >
               <TrendingDown
                 size={22}
-                style={{ fill: act ? "currentColor" : "none" }}
+                style={{ fill: "none" }}
               />
               {act && <span className="despensa-bottomnav-dot" />}
             </button>
@@ -144,7 +144,7 @@ export default function BottomNav({
             >
               <Home
                 size={22}
-                style={{ fill: act ? "currentColor" : "none" }}
+                style={{ fill: "none" }}
               />
               {act && <span className="despensa-bottomnav-dot" />}
             </button>
@@ -163,7 +163,7 @@ export default function BottomNav({
               >
                 <ShoppingCart
                   size={22}
-                  style={{ fill: act ? "currentColor" : "none" }}
+                  style={{ fill: "none" }}
                 />
                 {act && <span className="despensa-bottomnav-dot" />}
               </button>
@@ -181,7 +181,7 @@ export default function BottomNav({
               >
                 <ArrowLeftRight
                   size={22}
-                  style={{ fill: act ? "currentColor" : "none" }}
+                  style={{ fill: "none" }}
                 />
                 {act && <span className="despensa-bottomnav-dot" />}
               </button>
@@ -201,7 +201,7 @@ export default function BottomNav({
               <div style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                 <Bell
                   size={22}
-                  style={{ fill: act ? "currentColor" : "none" }}
+                  style={{ fill: "none" }}
                 />
                 {noLeidas > 0 && (
                   <span

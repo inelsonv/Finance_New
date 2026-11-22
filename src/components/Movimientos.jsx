@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Plus, Trash2, X, TrendingUp, TrendingDown, Landmark, PiggyBank, CreditCard, Ticket, Briefcase, Zap, Fuel, SquareParking, UtensilsCrossed, Coffee, ShoppingBag, Check, AlertTriangle, Pencil, History, Download } from "lucide-react";
+import { Plus, Trash2, X, TrendingUp, TrendingDown, Landmark, PiggyBank, CreditCard, Ticket, Briefcase, Zap, Fuel, SquareParking, UtensilsCrossed, Coffee, ShoppingBag, Check, AlertTriangle, Pencil, History, Download, Calendar } from "lucide-react";
 import { addMovimiento, deleteMovimiento, updateMovimientoFecha, updateMovimientoMonto, marcarConsumosComoPagados } from "../lib/db";
 import { lanzarCoheteHaciaPuntos } from "../lib/coheteVolando";
 import SwipeableRow from "./SwipeableRow.jsx";
 import Pagination from "./Pagination.jsx";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 import { CUENTA_TIPOS } from "./Cuentas.jsx";
 import { GASTO_CATS_FIJO, GASTO_CATS_VARIABLE } from "../lib/categorias";
 
@@ -73,6 +74,20 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
   const [expresError, setExpresError] = useState(null);
   const [expresSaving, setExpresSaving] = useState(false);
   const [page, setPage] = useState(1);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-movimientos-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-movimientos-vista", modo);
+    } catch {}
+  };
 
   const [editandoFechaId, setEditandoFechaId] = useState(null);
   const [editFecha, setEditFecha] = useState("");
@@ -86,16 +101,24 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
   const [editMontoSaving, setEditMontoSaving] = useState(false);
   const [editMontoError, setEditMontoError] = useState(null);
 
-  const startEditFecha = (m) => {
-    setEditandoFechaId(m.id);
-    setEditFecha(m.date || "");
+  const cancelEditFecha = () => {
+    setEditandoFechaId(null);
+    setEditFecha("");
     setEditMotivo("");
     setEditFechaError(null);
   };
 
-  const cancelEditFecha = () => {
-    setEditandoFechaId(null);
-    setEditFecha("");
+  const cancelEditMonto = () => {
+    setEditandoMontoId(null);
+    setEditMonto("");
+    setEditMontoMotivo("");
+    setEditMontoError(null);
+  };
+
+  const startEditFecha = (m) => {
+    cancelEditMonto();
+    setEditandoFechaId(m.id);
+    setEditFecha(m.date || "");
     setEditMotivo("");
     setEditFechaError(null);
   };
@@ -122,15 +145,9 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
   };
 
   const startEditMonto = (m) => {
+    cancelEditFecha();
     setEditandoMontoId(m.id);
     setEditMonto(m.amount != null ? String(m.amount) : "");
-    setEditMontoMotivo("");
-    setEditMontoError(null);
-  };
-
-  const cancelEditMonto = () => {
-    setEditandoMontoId(null);
-    setEditMonto("");
     setEditMontoMotivo("");
     setEditMontoError(null);
   };
@@ -809,7 +826,7 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => setShowForm((s) => !s)}
           style={{
@@ -829,6 +846,29 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar movimiento"}
         </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {movimientos.length > 0 && (
+            <button
+              onClick={handleDescargarCSV}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 14px",
+                fontSize: 12,
+                fontWeight: 500,
+                background: "var(--card)",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                color: "var(--ink-soft)",
+                cursor: "pointer",
+              }}
+            >
+              <Download size={13} /> Descargar CSV
+            </button>
+          )}
+          <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
+        </div>
       </div>
 
       {showForm && (
@@ -1345,295 +1385,487 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
         </div>
       )}
 
-      {movimientos.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-          <button
-            onClick={handleDescargarCSV}
+      {(() => {
+        const renderEditFechaForm = (m) => (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 10, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 8 }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>Editar fecha del movimiento</div>
+            <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Nueva fecha</div>
+                <input
+                  type="date"
+                  value={editFecha}
+                  onChange={(e) => setEditFecha(e.target.value)}
+                  style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Motivo del cambio (obligatorio)</div>
+                <input
+                  placeholder="Ej. Se registró con la fecha equivocada"
+                  value={editMotivo}
+                  onChange={(e) => setEditMotivo(e.target.value)}
+                  style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13 }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => saveEditFecha(m)}
+                disabled={editFechaSaving}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: editFechaSaving ? "not-allowed" : "pointer" }}
+              >
+                <Check size={12} /> {editFechaSaving ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                onClick={cancelEditFecha}
+                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 7, cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+            </div>
+            {editFechaError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--stamp)" }}>{editFechaError}</div>}
+          </div>
+        );
+
+        const renderEditMontoForm = (m) => (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ padding: 10, background: "var(--card)", border: "1px solid var(--line)", borderRadius: 8 }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>Editar monto del movimiento</div>
+            <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Nuevo monto</div>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editMonto}
+                  onChange={(e) => setEditMonto(e.target.value)}
+                  style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Motivo del cambio (obligatorio)</div>
+                <input
+                  placeholder="Ej. Puse un monto menor al real por error"
+                  value={editMontoMotivo}
+                  onChange={(e) => setEditMontoMotivo(e.target.value)}
+                  style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13 }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => saveEditMonto(m)}
+                disabled={editMontoSaving}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: editMontoSaving ? "not-allowed" : "pointer" }}
+              >
+                <Check size={12} /> {editMontoSaving ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                onClick={cancelEditMonto}
+                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 7, cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+            </div>
+            {editMontoError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--stamp)" }}>{editMontoError}</div>}
+          </div>
+        );
+
+        const renderMovIcon = (m) => (
+          <div
             style={{
-              display: "flex",
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              flexShrink: 0,
+              display: "inline-flex",
               alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              fontSize: 12,
-              fontWeight: 500,
-              background: "var(--card)",
-              border: "1px solid var(--line)",
-              borderRadius: 8,
-              color: "var(--ink-soft)",
-              cursor: "pointer",
+              justifyContent: "center",
+              background: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage-bg)" : "var(--stamp-bg)",
+              color: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage)" : "var(--stamp)",
             }}
           >
-            <Download size={13} /> Descargar CSV
-          </button>
-        </div>
-      )}
+            {m.category === "Desembolso de préstamo" || m.type === "Desembolso" ? (
+              <Landmark size={12} />
+            ) : m.category === "Pago de préstamo" ? (
+              <Landmark size={12} />
+            ) : m.category === "Pago de tarjeta" ? (
+              <CreditCard size={12} />
+            ) : m.metodoPago === "Tarjeta de crédito" ? (
+              <CreditCard size={12} />
+            ) : m.category === "Pago de membresía" ? (
+              <Ticket size={12} />
+            ) : m.category === "Pago de servicio" ? (
+              <Zap size={12} />
+            ) : m.fuenteIngresoNombre ? (
+              <Briefcase size={12} />
+            ) : CUENTA_MOVIMIENTO_TIPOS.includes(m.category) ? (
+              <PiggyBank size={12} />
+            ) : m.type === "Ingreso" ? (
+              <TrendingUp size={12} />
+            ) : (
+              <TrendingDown size={12} />
+            )}
+          </div>
+        );
 
-      {movimientos.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
-          Todavía no registraste ningún movimiento.
-        </div>
-      ) : (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", background: "var(--card)", minHeight: PAGE_SIZE * 53 }}>
-          {paginated.map((m, i) => (
-            <SwipeableRow key={m.id} onDelete={async () => { const motivo = await confirm("¿Eliminar este movimiento? Escribe brevemente por qué.", { requireReason: true, reasonPlaceholder: "Ej. Lo registré por error" }); if (motivo) deleteMovimiento(m.id, motivo); }}>
-            <div
-              className="despensa-row"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "9px 12px",
-                borderTop: i === 0 ? "none" : "1px solid var(--line-soft)",
+        if (movimientos.length === 0) {
+          return (
+            <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
+              Todavía no registraste ningún movimiento.
+            </div>
+          );
+        }
+
+        if (vistaModo === "tabla") {
+          return (
+            <CrudTable
+              rows={paginated}
+              columns={[
+                {
+                  key: "no",
+                  label: "No.",
+                  mono: true,
+                  render: (_m, idx) => (
+                    <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+                      {(page - 1) * PAGE_SIZE + idx + 1}
+                    </span>
+                  ),
+                },
+                {
+                  key: "fecha",
+                  label: "Fecha",
+                  mono: true,
+                  render: (m) => (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span>{formatDateDisplay(m.date)}</span>
+                      {m.historialCambiosFecha?.length > 0 && (
+                        <span title={`Fecha editada ${m.historialCambiosFecha.length} vez(es)`} style={{ display: "inline-flex" }}>
+                          <History size={11} style={{ color: "var(--ink-soft)" }} />
+                        </span>
+                      )}
+                    </span>
+                  ),
+                },
+                {
+                  key: "categoria",
+                  label: "Categoría / Detalle",
+                  wrap: true,
+                  render: (m) => {
+                    const infoCuota = m.category === "Pago de préstamo" ? cuotaNumeroPorMovimientoId.get(m.id) : null;
+                    const subPartes = [
+                      m.prestamoNumero,
+                      m.tarjetaNombre,
+                      m.membresiaNombre,
+                      m.fuenteIngresoNombre,
+                      m.contratoNombre,
+                      m.description,
+                    ].filter(Boolean);
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {renderMovIcon(m)}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontWeight: 600, color: "var(--ink)" }}>{m.category}</span>
+                            {infoCuota && (
+                              <span
+                                className="despensa-mono"
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  padding: "1px 6px",
+                                  borderRadius: 6,
+                                  background: "var(--sage-bg)",
+                                  color: "var(--sage)",
+                                }}
+                              >
+                                Cuota #{infoCuota.numero}{infoCuota.total ? `/${infoCuota.total}` : ""}
+                              </span>
+                            )}
+                            {m.clasificacion && (
+                              <span
+                                className="despensa-mono"
+                                style={{
+                                  fontSize: 10,
+                                  padding: "1px 6px",
+                                  borderRadius: 10,
+                                  background: m.clasificacion === "Fijo" ? "var(--stamp-bg)" : "var(--sage-bg)",
+                                  color: m.clasificacion === "Fijo" ? "var(--stamp)" : "var(--sage)",
+                                }}
+                              >
+                                {m.clasificacion}
+                              </span>
+                            )}
+                          </div>
+                          {subPartes.length > 0 && (
+                            <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{subPartes.join(" · ")}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: "origen",
+                  label: "Entidad / Cuenta",
+                  wrap: true,
+                  render: (m) => {
+                    const detalles = [];
+                    if (m.entidadName) detalles.push(m.entidadName);
+                    if (m.cuentaNombre && m.type === "Desembolso") detalles.push(`Acreditado: ${m.cuentaNombre}`);
+                    else if (m.cuentaNombre && m.type === "Ingreso") detalles.push(`Cuenta: ${m.cuentaNombre}`);
+                    if (m.cuentaOrigenNombre) detalles.push(`Desde: ${m.cuentaOrigenNombre}`);
+                    if (m.metodoPago) detalles.push(m.metodoPago);
+                    return (
+                      <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+                        {detalles.length > 0 ? detalles.join(" · ") : "—"}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: "monto",
+                  label: "Monto",
+                  align: "right",
+                  mono: true,
+                  render: (m) => (
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage)" : "var(--stamp)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      {m.type === "Ingreso" || m.type === "Desembolso" ? "+" : "−"}
+                      {formatMoney(m.amount)}
+                      {m.historialCambiosMonto?.length > 0 && (
+                        <span title={`Monto editado ${m.historialCambiosMonto.length} vez(es)`} style={{ display: "inline-flex" }}>
+                          <History size={11} style={{ color: "var(--ink-soft)" }} />
+                        </span>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+              extraActions={(m) => (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => (editandoMontoId === m.id ? cancelEditMonto() : startEditMonto(m))}
+                    title="Editar monto"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "5px 10px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      background: editandoMontoId === m.id ? "var(--sage-bg)" : "var(--card)",
+                      color: editandoMontoId === m.id ? "var(--sage)" : "var(--ink)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Pencil size={12} /> Monto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => (editandoFechaId === m.id ? cancelEditFecha() : startEditFecha(m))}
+                    title="Editar fecha"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "5px 10px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      background: editandoFechaId === m.id ? "var(--sage-bg)" : "var(--card)",
+                      color: editandoFechaId === m.id ? "var(--sage)" : "var(--ink)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Calendar size={12} /> Fecha
+                  </button>
+                </>
+              )}
+              onDelete={async (m) => {
+                const motivo = await confirm("¿Eliminar este movimiento? Escribe brevemente por qué.", {
+                  requireReason: true,
+                  reasonPlaceholder: "Ej. Lo registré por error",
+                });
+                if (motivo) deleteMovimiento(m.id, motivo);
               }}
-            >
+              isRowExpanded={(m) => editandoMontoId === m.id || editandoFechaId === m.id}
+              renderExpandedRow={(m) => (editandoMontoId === m.id ? renderEditMontoForm(m) : renderEditFechaForm(m))}
+            />
+          );
+        }
+
+        return (
+          <div style={{ border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", background: "var(--card)", minHeight: PAGE_SIZE * 53 }}>
+            {paginated.map((m, i) => (
+              <SwipeableRow key={m.id} onDelete={async () => { const motivo = await confirm("¿Eliminar este movimiento? Escribe brevemente por qué.", { requireReason: true, reasonPlaceholder: "Ej. Lo registré por error" }); if (motivo) deleteMovimiento(m.id, motivo); }}>
               <div
+                className="despensa-row"
                 style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "50%",
-                  flexShrink: 0,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  background: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage-bg)" : "var(--stamp-bg)",
-                  color: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage)" : "var(--stamp)",
+                  gap: 10,
+                  padding: "9px 12px",
+                  borderTop: i === 0 ? "none" : "1px solid var(--line-soft)",
                 }}
               >
-                {m.category === "Desembolso de préstamo" || m.type === "Desembolso" ? (
-                  <Landmark size={12} />
-                ) : m.category === "Pago de préstamo" ? (
-                  <Landmark size={12} />
-                ) : m.category === "Pago de tarjeta" ? (
-                  <CreditCard size={12} />
-                ) : m.metodoPago === "Tarjeta de crédito" ? (
-                  <CreditCard size={12} />
-                ) : m.category === "Pago de membresía" ? (
-                  <Ticket size={12} />
-                ) : m.category === "Pago de servicio" ? (
-                  <Zap size={12} />
-                ) : m.fuenteIngresoNombre ? (
-                  <Briefcase size={12} />
-                ) : CUENTA_MOVIMIENTO_TIPOS.includes(m.category) ? (
-                  <PiggyBank size={12} />
-                ) : m.type === "Ingreso" ? (
-                  <TrendingUp size={13} />
-                ) : (
-                  <TrendingDown size={13} />
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <span>{m.category}</span>
-                  {m.prestamoNumero && <span className="despensa-mono" style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.prestamoNumero}</span>}
-                  {m.category === "Pago de préstamo" && cuotaNumeroPorMovimientoId.has(m.id) && (() => {
-                    const infoCuota = cuotaNumeroPorMovimientoId.get(m.id);
-                    return (
+                {renderMovIcon(m)}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span>{m.category}</span>
+                    {m.prestamoNumero && <span className="despensa-mono" style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.prestamoNumero}</span>}
+                    {m.category === "Pago de préstamo" && cuotaNumeroPorMovimientoId.has(m.id) && (() => {
+                      const infoCuota = cuotaNumeroPorMovimientoId.get(m.id);
+                      return (
+                        <span
+                          className="despensa-mono"
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: 6,
+                            background: "var(--sage-bg)",
+                            color: "var(--sage)",
+                          }}
+                        >
+                          Cuota #{infoCuota.numero}{infoCuota.total ? `/${infoCuota.total}` : ""}
+                        </span>
+                      );
+                    })()}
+                    {m.tarjetaNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.tarjetaNombre}</span>}
+                    {m.membresiaNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.membresiaNombre}</span>}
+                    {m.fuenteIngresoNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.fuenteIngresoNombre}</span>}
+                    {m.contratoNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.contratoNombre}</span>}
+                    {m.description && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.description}</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 1 }}>
+                    {formatDateDisplay(m.date)}
+                    {m.entidadName && <> · {m.entidadName}</>}
+                    {m.cuentaNombre && m.type === "Desembolso" && <> · Acreditado en {m.cuentaNombre}</>}
+                    {m.cuentaNombre && m.type === "Ingreso" && <> · Cuenta: {m.cuentaNombre}</>}
+                    {m.cuentaOrigenNombre && <> · Pagado desde: {m.cuentaOrigenNombre}</>}
+                    {m.clasificacion && (
                       <span
                         className="despensa-mono"
                         style={{
-                          fontSize: 10.5,
-                          fontWeight: 700,
+                          marginLeft: 6,
+                          fontSize: 10,
                           padding: "1px 6px",
-                          borderRadius: 6,
-                          background: "var(--sage-bg)",
-                          color: "var(--sage)",
+                          borderRadius: 10,
+                          background: m.clasificacion === "Fijo" ? "var(--stamp-bg)" : "var(--sage-bg)",
+                          color: m.clasificacion === "Fijo" ? "var(--stamp)" : "var(--sage)",
                         }}
                       >
-                        Cuota #{infoCuota.numero}{infoCuota.total ? `/${infoCuota.total}` : ""}
+                        {m.clasificacion}
                       </span>
-                    );
-                  })()}
-                  {m.tarjetaNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.tarjetaNombre}</span>}
-                  {m.membresiaNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.membresiaNombre}</span>}
-                  {m.fuenteIngresoNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.fuenteIngresoNombre}</span>}
-                  {m.contratoNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.contratoNombre}</span>}
-                  {m.metodoPago === "Tarjeta de crédito" && m.tarjetaNombre && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.tarjetaNombre}</span>}
-                  {m.description && <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>· {m.description}</span>}
+                    )}
+                    {m.historialCambiosFecha?.length > 0 && (
+                      <span title={`Fecha editada ${m.historialCambiosFecha.length} vez(es)`} style={{ marginLeft: 6, display: "inline-flex", verticalAlign: "middle" }}>
+                        <History size={11} style={{ color: "var(--ink-soft)" }} />
+                      </span>
+                    )}
+                  </div>
+
+                  {editandoFechaId === m.id && <div style={{ marginTop: 8 }}>{renderEditFechaForm(m)}</div>}
+                  {editandoMontoId === m.id && <div style={{ marginTop: 8 }}>{renderEditMontoForm(m)}</div>}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 1 }}>
-                  {formatDateDisplay(m.date)}
-                  {m.entidadName && <> · {m.entidadName}</>}
-                  {m.cuentaNombre && m.type === "Desembolso" && <> · Acreditado en {m.cuentaNombre}</>}
-                  {m.cuentaNombre && m.type === "Ingreso" && <> · Cuenta: {m.cuentaNombre}</>}
-                  {m.cuentaOrigenNombre && <> · Pagado desde: {m.cuentaOrigenNombre}</>}
-                  {m.clasificacion && (
-                    <span
-                      className="despensa-mono"
-                      style={{
-                        marginLeft: 6,
-                        fontSize: 10,
-                        padding: "1px 6px",
-                        borderRadius: 10,
-                        background: m.clasificacion === "Fijo" ? "var(--stamp-bg)" : "var(--sage-bg)",
-                        color: m.clasificacion === "Fijo" ? "var(--stamp)" : "var(--sage)",
-                      }}
-                    >
-                      {m.clasificacion}
-                    </span>
-                  )}
-                  {m.historialCambiosFecha?.length > 0 && (
-                    <span title={`Fecha editada ${m.historialCambiosFecha.length} vez(es)`} style={{ marginLeft: 6, display: "inline-flex", verticalAlign: "middle" }}>
+                <span
+                  className="despensa-mono"
+                  style={{ fontSize: 13, fontWeight: 500, color: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage)" : "var(--stamp)", flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  {m.type === "Ingreso" || m.type === "Desembolso" ? "+" : "−"}{formatMoney(m.amount)}
+                  {m.historialCambiosMonto?.length > 0 && (
+                    <span title={`Monto editado ${m.historialCambiosMonto.length} vez(es)`} style={{ display: "inline-flex" }}>
                       <History size={11} style={{ color: "var(--ink-soft)" }} />
                     </span>
                   )}
-                </div>
-
-                {editandoFechaId === m.id && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ marginTop: 8, padding: 10, background: "var(--paper)", border: "1px solid var(--line)", borderRadius: 8 }}
-                  >
-                    <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Nueva fecha</div>
-                    <input
-                      type="date"
-                      value={editFecha}
-                      onChange={(e) => setEditFecha(e.target.value)}
-                      style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13, marginBottom: 8 }}
-                    />
-                    <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Motivo del cambio (obligatorio)</div>
-                    <input
-                      placeholder="Ej. Se registró con la fecha equivocada"
-                      value={editMotivo}
-                      onChange={(e) => setEditMotivo(e.target.value)}
-                      style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13, marginBottom: 8 }}
-                    />
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => saveEditFecha(m)}
-                        disabled={editFechaSaving}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: editFechaSaving ? "not-allowed" : "pointer" }}
-                      >
-                        <Check size={12} /> {editFechaSaving ? "Guardando…" : "Guardar"}
-                      </button>
-                      <button
-                        onClick={cancelEditFecha}
-                        style={{ padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 7, cursor: "pointer" }}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                    {editFechaError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--stamp)" }}>{editFechaError}</div>}
-                  </div>
-                )}
-
-                {editandoMontoId === m.id && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ marginTop: 8, padding: 10, background: "var(--paper)", border: "1px solid var(--line)", borderRadius: 8 }}
-                  >
-                    <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Nuevo monto</div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editMonto}
-                      onChange={(e) => setEditMonto(e.target.value)}
-                      style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13, marginBottom: 8 }}
-                    />
-                    <div style={{ fontSize: 10.5, color: "var(--ink-soft)", marginBottom: 3 }}>Motivo del cambio (obligatorio)</div>
-                    <input
-                      placeholder="Ej. Puse un monto menor al real por error"
-                      value={editMontoMotivo}
-                      onChange={(e) => setEditMontoMotivo(e.target.value)}
-                      style={{ width: "100%", padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 13, marginBottom: 8 }}
-                    />
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => saveEditMonto(m)}
-                        disabled={editMontoSaving}
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: editMontoSaving ? "not-allowed" : "pointer" }}
-                      >
-                        <Check size={12} /> {editMontoSaving ? "Guardando…" : "Guardar"}
-                      </button>
-                      <button
-                        onClick={cancelEditMonto}
-                        style={{ padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 7, cursor: "pointer" }}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                    {editMontoError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--stamp)" }}>{editMontoError}</div>}
-                  </div>
-                )}
+                </span>
+                <button
+                  onClick={() => (editandoMontoId === m.id ? cancelEditMonto() : startEditMonto(m))}
+                  title="Editar monto"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    background: "transparent",
+                    color: editandoMontoId === m.id ? "var(--sage)" : "var(--ink-soft)",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  onClick={() => (editandoFechaId === m.id ? cancelEditFecha() : startEditFecha(m))}
+                  title="Editar fecha"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    background: "transparent",
+                    color: editandoFechaId === m.id ? "var(--sage)" : "var(--ink-soft)",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Calendar size={13} />
+                </button>
+                <button
+                  onClick={async () => {
+                    const motivo = await confirm("¿Eliminar este movimiento? Escribe brevemente por qué.", {
+                      requireReason: true,
+                      reasonPlaceholder: "Ej. Lo registré por error",
+                    });
+                    if (motivo) deleteMovimiento(m.id, motivo);
+                  }}
+                  title="Eliminar movimiento"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    background: "transparent",
+                    color: "var(--ink-soft)",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
-              <span
-                className="despensa-mono"
-                style={{ fontSize: 13, fontWeight: 500, color: m.type === "Ingreso" || m.type === "Desembolso" ? "var(--sage)" : "var(--stamp)", flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
-              >
-                {m.type === "Ingreso" || m.type === "Desembolso" ? "+" : "−"}{formatMoney(m.amount)}
-                {m.historialCambiosMonto?.length > 0 && (
-                  <span title={`Monto editado ${m.historialCambiosMonto.length} vez(es)`} style={{ display: "inline-flex" }}>
-                    <History size={11} style={{ color: "var(--ink-soft)" }} />
-                  </span>
-                )}
-              </span>
-              <button
-                onClick={() => (editandoMontoId === m.id ? cancelEditMonto() : startEditMonto(m))}
-                title="Editar monto"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 26,
-                  height: 26,
-                  background: "transparent",
-                  color: editandoMontoId === m.id ? "var(--sage)" : "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={() => (editandoFechaId === m.id ? cancelEditFecha() : startEditFecha(m))}
-                title="Editar fecha"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 26,
-                  height: 26,
-                  background: "transparent",
-                  color: editandoFechaId === m.id ? "var(--sage)" : "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={async () => {
-                  const motivo = await confirm("¿Eliminar este movimiento? Escribe brevemente por qué.", {
-                    requireReason: true,
-                    reasonPlaceholder: "Ej. Lo registré por error",
-                  });
-                  if (motivo) deleteMovimiento(m.id, motivo);
-                }}
-                title="Eliminar movimiento"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 26,
-                  height: 26,
-                  background: "transparent",
-                  color: "var(--ink-soft)",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-            </SwipeableRow>
-          ))}
-        </div>
-      )}
+              </SwipeableRow>
+            ))}
+          </div>
+        );
+      })()}
 
       <Pagination page={page} totalItems={movimientos.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

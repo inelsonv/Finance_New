@@ -176,9 +176,10 @@ export default function Sidebar({ tab, setTab, listCount, prestamosActivosCount,
               >
                 <Icon
                   size={16}
+                  strokeWidth={active ? 2.25 : 1.9}
                   style={{
                     flexShrink: 0,
-                    fill: active ? "currentColor" : "none",
+                    fill: "none",
                   }}
                 />
                 {!collapsed && (
