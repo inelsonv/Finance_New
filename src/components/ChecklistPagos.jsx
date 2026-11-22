@@ -1505,7 +1505,7 @@ export default function ChecklistPagos({
           montos de cada categoría, o revisa que tengas préstamos activos.
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="checklist-items-grid">
           {items.map((it) => {
             const estadoBase = checklist?.items?.[it.key] || {};
             const estado = { ...estadoBase, pagado: esItemPagado(it) };
@@ -1519,6 +1519,8 @@ export default function ChecklistPagos({
                   key={`${periodoKey}:${it.key}`}
                   className="checklist-variable-card"
                   style={{
+                    display: "flex",
+                    flexDirection: "column",
                     background: "var(--card)",
                     border: `1px solid ${excedido ? "var(--stamp)" : "var(--line)"}`,
                     borderRadius: 10,
@@ -1550,7 +1552,7 @@ export default function ChecklistPagos({
                   </div>
 
                   {/* Fila inferior: Indicador de consumo gradual y botones de acción */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: "auto", paddingTop: 7, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>
                       Consumo gradual ({pct.toFixed(0)}%{excedido ? " — ¡Excedido!" : ""})
                     </span>
@@ -2021,7 +2023,8 @@ export default function ChecklistPagos({
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 8,
-                  marginTop: 2,
+                  marginTop: "auto",
+                  paddingTop: 2,
                   paddingLeft: 36,
                   flexWrap: "wrap",
                   width: "100%",
@@ -2263,82 +2266,82 @@ export default function ChecklistPagos({
         </div>
       )}
 
-      {transferenciasDesdePeriodo.length > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            marginBottom: 14,
-            padding: "12px 14px",
-            background: "var(--paper)",
-            border: "1px dashed var(--line)",
-            borderRadius: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8 }}>
-            <ArrowLeftRight size={13} style={{ color: "var(--sage)" }} />
-            <span>Gastos pasados a otra quincena ({transferenciasDesdePeriodo.length})</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {transferenciasDesdePeriodo.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 12,
-                  padding: "6px 8px",
-                  background: "var(--card)",
-                  border: "1px solid var(--line)",
-                  borderRadius: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <strong style={{ color: "var(--ink)" }}>{t.categoria}</strong>:{" "}
-                  <span className="despensa-mono" style={{ fontWeight: 700, color: "var(--sage)" }}>
-                    {formatMoney(t.monto)}
-                  </span>{" "}
-                  <span style={{ color: "var(--ink-soft)", fontSize: 11.5 }}>
-                    → pasado a la {t.destino?.quincena === "Q1" ? "1ra" : "2da"} quincena de {MESES[t.destino?.month - 1]} {t.destino?.year}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRevertirTransferencia(t)}
-                  disabled={moviendoGastoCargando}
-                  title="Devolver este gasto a esta quincena"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--sage)",
-                    background: "var(--sage-bg)",
-                    border: "1px solid var(--sage)",
-                    padding: "3px 8px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                  }}
-                >
-                  Devolver a esta quincena
-                </button>
+      {(transferenciasDesdePeriodo.length > 0 || itemsEliminados.length > 0) && (
+        <div className="checklist-secondary-grid">
+          {transferenciasDesdePeriodo.length > 0 && (
+            <div
+              style={{
+                padding: "12px 14px",
+                background: "var(--paper)",
+                border: "1px dashed var(--line)",
+                borderRadius: 10,
+                minWidth: 0,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8 }}>
+                <ArrowLeftRight size={13} style={{ color: "var(--sage)" }} />
+                <span>Gastos pasados a otra quincena ({transferenciasDesdePeriodo.length})</span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {transferenciasDesdePeriodo.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      fontSize: 12,
+                      padding: "6px 8px",
+                      background: "var(--card)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <strong style={{ color: "var(--ink)" }}>{t.categoria}</strong>:{" "}
+                      <span className="despensa-mono" style={{ fontWeight: 700, color: "var(--sage)" }}>
+                        {formatMoney(t.monto)}
+                      </span>{" "}
+                      <span style={{ color: "var(--ink-soft)", fontSize: 11.5 }}>
+                        → pasado a la {t.destino?.quincena === "Q1" ? "1ra" : "2da"} quincena de {MESES[t.destino?.month - 1]} {t.destino?.year}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRevertirTransferencia(t)}
+                      disabled={moviendoGastoCargando}
+                      title="Devolver este gasto a esta quincena"
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--sage)",
+                        background: "var(--sage-bg)",
+                        border: "1px solid var(--sage)",
+                        padding: "3px 8px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Devolver a esta quincena
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {itemsEliminados.length > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            marginBottom: 14,
-            padding: "12px 14px",
-            background: "var(--paper)",
-            border: "1px dashed var(--line)",
-            borderRadius: 10,
-          }}
-        >
+          {itemsEliminados.length > 0 && (
+            <div
+              style={{
+                padding: "12px 14px",
+                background: "var(--paper)",
+                border: "1px dashed var(--line)",
+                borderRadius: 10,
+                minWidth: 0,
+              }}
+            >
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "var(--stamp)", textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8 }}>
             <Trash2 size={13} style={{ color: "var(--stamp)" }} />
             <span>Gastos eliminados de esta quincena ({itemsEliminados.length})</span>
@@ -2391,6 +2394,8 @@ export default function ChecklistPagos({
               </div>
             ))}
           </div>
+        </div>
+          )}
         </div>
       )}
 
