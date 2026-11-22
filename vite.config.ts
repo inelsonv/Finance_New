@@ -6,9 +6,14 @@ import {defineConfig} from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1];
+const ghBase = repoName
+  ? (repoName.endsWith('.github.io') ? '/' : `/${repoName}/`)
+  : '/Finance/';
+
 export default defineConfig(() => {
   return {
-    base: process.env.GITHUB_ACTIONS ? '/Finance/' : '/',
+    base: process.env.GITHUB_ACTIONS ? ghBase : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

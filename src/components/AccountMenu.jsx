@@ -7,7 +7,10 @@ import ThemeSelector from "./ThemeSelector.jsx";
 import ModalPlanesSuscripcion from "./ModalPlanesSuscripcion.jsx";
 import { SkeletonList } from "./Skeleton.jsx";
 
-const APP_URL = "https://inelsonv.github.io/Finance/";
+const APP_URL =
+  typeof window !== "undefined"
+    ? `${window.location.origin}${import.meta.env.BASE_URL}`
+    : "https://inelsonv.github.io/Finance_New/";
 
 export default function AccountMenu({ user, isOwner, onSignOut, onOpenSettings, synced, ahorroActivo, estrategiaDeudas, theme, onSelectTheme, planActual }) {
   const [open, setOpen] = useState(false);
