@@ -15,6 +15,7 @@ import {
   describirEscenarioDivision,
   contarMesesDivision,
 } from "../lib/prestamoDivision";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 const PLAZO_UNIDADES = ["meses", "años"];
 const TIPOS_PRESTAMO = ["Vehículo", "Hipotecario / Vivienda", "Personal", "Estudiantil", "Consolidación de deuda", "Negocio", "Otro"];
@@ -1123,6 +1124,13 @@ const emptyForm = (numero, cuentas = []) => {
 
 export default function Prestamos({ prestamos, entidades, movimientos, activos, cuentas = [], focusPrestamoId, soloCuotasEndeudamiento = false, onClearFiltroEndeudamiento }) {
   const [showForm, setShowForm] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-prestamos-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
   const [showHistorico, setShowHistorico] = useState(() => {
     try {
       const saved = localStorage.getItem("smart-finance-prestamos-historico-open");
@@ -1694,6 +1702,591 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
     }
   };
 
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-prestamos-vista", modo);
+    } catch {}
+  };
+
+  const renderEditForm = (p) => (
+    <div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "0.8fr 1.5fr", gap: 8, marginBottom: 8 }}>
+        <div className="despensa-mono" style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--paper)", color: "var(--ink-soft)" }}>
+          {p.numero}
+        </div>
+        <select
+          value={editForm.entidadId}
+          onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          <option value="">Entidad prestamista…</option>
+          {entidades.map((e) => (
+            <option key={e.docId} value={e.docId}>{e.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <select
+          value={editForm.tipo}
+          onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
+          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {TIPOS_PRESTAMO.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
+
+      {editForm.tipo === "Vehículo" && (
+        <div style={{ marginBottom: 8 }}>
+          {activos.filter((a) => a.tipo === "Vehículo").length === 0 ? (
+            <div style={{ fontSize: 11.5, color: "var(--ink-soft)", padding: "4px 0" }}>
+              No tienes vehículos registrados en Activos todavía (opcional).
+            </div>
+          ) : (
+            <select
+              value={editForm.activoId}
+              onChange={(e) => setEditForm({ ...editForm, activoId: e.target.value })}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+            >
+              <option value="">Vincular a un vehículo de Activos (opcional)…</option>
+              {activos.filter((a) => a.tipo === "Vehículo").map((a) => (
+                <option key={a.id} value={a.id}>{a.nombre}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 8, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={editForm.esRevolvente}
+          onChange={(e) => setEditForm({ ...editForm, esRevolvente: e.target.checked })}
+        />
+        Es un préstamo revolvente (al pagar, el monto queda disponible para volver a retirar)
+      </label>
+      {editForm.esRevolvente && (
+        <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+          <input
+            className="despensa-mono"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Saldo actual utilizado"
+            value={editForm.saldoActual}
+            onChange={(e) => setEditForm({ ...editForm, saldoActual: e.target.value })}
+            style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+          <input
+            className="despensa-mono"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Mínimo disponible para retirar"
+            value={editForm.montoMinimoRetiro}
+            onChange={(e) => setEditForm({ ...editForm, montoMinimoRetiro: e.target.value })}
+            style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+        </div>
+      )}
+
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          className="despensa-mono"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="Monto aprobado"
+          value={editForm.montoAprobado}
+          onChange={(e) => setEditForm({ ...editForm, montoAprobado: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <div style={{ display: "flex", gap: 4 }}>
+          <input
+            className="despensa-mono"
+            type="number"
+            step="1"
+            min="0"
+            placeholder="Plazo"
+            value={editForm.plazo}
+            onChange={(e) => setEditForm({ ...editForm, plazo: e.target.value })}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+          <select
+            value={editForm.plazoUnidad}
+            onChange={(e) => setEditForm({ ...editForm, plazoUnidad: e.target.value })}
+            style={{ padding: "8px 4px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 12, background: "var(--card)" }}
+          >
+            {PLAZO_UNIDADES.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ position: "relative" }}>
+          <input
+            className="despensa-mono"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Tasa interés"
+            value={editForm.tasaInteres}
+            onChange={(e) => setEditForm({ ...editForm, tasaInteres: e.target.value })}
+            style={{ width: "100%", padding: "8px 22px 8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+          <Percent size={12} style={{ position: "absolute", right: 8, top: 11, color: "var(--ink-soft)" }} />
+        </div>
+      </div>
+
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          type="date"
+          value={editForm.fechaInicio}
+          onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
+          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <select
+          value={editForm.estado}
+          onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
+          disabled={p.estado === "Pagado"}
+          title={p.estado === "Pagado" ? "Este préstamo ya está saldado y no se puede revertir" : undefined}
+          style={{
+            padding: "8px 10px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            fontSize: 13,
+            background: p.estado === "Pagado" ? "var(--line-soft)" : "var(--card)",
+            color: p.estado === "Pagado" ? "var(--ink-soft)" : "var(--ink)",
+            cursor: p.estado === "Pagado" ? "not-allowed" : "pointer",
+          }}
+        >
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      {p.estado === "Pagado" && (
+        <div style={{ fontSize: 11, color: "var(--sage)", marginTop: -4, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
+          <Check size={11} /> Préstamo saldado por completo — el estado ya no se puede cambiar.
+        </div>
+      )}
+
+      <div style={{ marginBottom: 8 }}>
+        <select
+          value={editForm.frecuenciaCuota}
+          onChange={(e) => setEditForm({ ...editForm, frecuenciaCuota: e.target.value })}
+          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          <option value="Mensual">Cuota mensual fija (se calcula sola cada mes)</option>
+          <option value="Personalizado">Fechas específicas (cuotas irregulares)</option>
+        </select>
+      </div>
+
+      {editForm.frecuenciaCuota === "Mensual" ? (
+        <div style={{ marginBottom: 8 }}>
+          <input
+            className="despensa-mono"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Cuota mensual"
+            value={editForm.cuota}
+            onChange={(e) => setEditForm({ ...editForm, cuota: e.target.value })}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
+          />
+          <SeccionDividirCuota
+            cuota={editForm.cuota}
+            dividirEnQuincenas={editForm.dividirEnQuincenas}
+            cuotaQ1={editForm.cuotaQ1}
+            cuotaQ2={editForm.cuotaQ2}
+            escenarioDivision={editForm.escenarioDivision}
+            semestresDivision={editForm.semestresDivision}
+            trimestresDivision={editForm.trimestresDivision}
+            mesesDivision={editForm.mesesDivision}
+            modoAnioDivision={editForm.modoAnioDivision}
+            anioDivision={editForm.anioDivision}
+            onChangeDividir={(val) => setEditForm((prev) => ({ ...prev, dividirEnQuincenas: val }))}
+            onChangeQ1={(val) => setEditForm((prev) => ({ ...prev, cuotaQ1: val }))}
+            onChangeQ2={(val) => setEditForm((prev) => ({ ...prev, cuotaQ2: val }))}
+            onChangeEscenario={(val) => setEditForm((prev) => ({ ...prev, escenarioDivision: val }))}
+            onChangeSemestres={(val) => setEditForm((prev) => ({ ...prev, semestresDivision: val }))}
+            onChangeTrimestres={(val) => setEditForm((prev) => ({ ...prev, trimestresDivision: val }))}
+            onChangeMeses={(val) => setEditForm((prev) => ({ ...prev, mesesDivision: val }))}
+            onChangeModoAnio={(val) => setEditForm((prev) => ({ ...prev, modoAnioDivision: val }))}
+            onChangeAnio={(val) => setEditForm((prev) => ({ ...prev, anioDivision: val }))}
+          />
+        </div>
+      ) : (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: 6 }}>
+            Agrega cada cuota con su fecha y monto exactos:
+          </div>
+          {editForm.cuotasPersonalizadas.map((c, idx) => (
+            <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+              <input
+                type="date"
+                value={c.fecha}
+                onChange={(e) => {
+                  const list = [...editForm.cuotasPersonalizadas];
+                  list[idx] = { ...list[idx], fecha: e.target.value };
+                  setEditForm({ ...editForm, cuotasPersonalizadas: list });
+                }}
+                style={{ flex: 1, minWidth: 0, padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12.5 }}
+              />
+              <input
+                className="despensa-mono"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Monto"
+                value={c.monto}
+                onChange={(e) => {
+                  const list = [...editForm.cuotasPersonalizadas];
+                  list[idx] = { ...list[idx], monto: e.target.value };
+                  setEditForm({ ...editForm, cuotasPersonalizadas: list });
+                }}
+                style={{ width: 90, flexShrink: 0, padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12.5 }}
+              />
+              <button
+                onClick={() => setEditForm({ ...editForm, cuotasPersonalizadas: editForm.cuotasPersonalizadas.filter((_, i) => i !== idx) })}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, flexShrink: 0, background: "transparent", border: "none", color: "var(--stamp)", cursor: "pointer" }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setEditForm({ ...editForm, cuotasPersonalizadas: [...editForm.cuotasPersonalizadas, { fecha: "", monto: "" }] })}
+            style={{ fontSize: 12, color: "var(--sage)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            + Agregar cuota
+          </button>
+        </div>
+      )}
+
+      <SeccionCuentaDestino formState={editForm} setFormState={setEditForm} cuentas={cuentas} entidades={entidades} movimientos={movimientos} prestamos={prestamos} esNuevo={false} />
+
+      <input
+        placeholder="Notas (opcional)"
+        value={editForm.notas}
+        onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
+      />
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 8, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={editForm.notificarWhatsapp}
+          onChange={(e) => setEditForm({ ...editForm, notificarWhatsapp: e.target.checked })}
+        />
+        Notificar pagos de este préstamo por WhatsApp
+      </label>
+      {editForm.notificarWhatsapp && (
+        <div style={{ fontSize: 11.5, color: entidades.find((e) => e.docId === editForm.entidadId)?.phone ? "var(--ink-soft)" : "var(--stamp)", marginBottom: 10 }}>
+          {entidades.find((e) => e.docId === editForm.entidadId)?.phone
+            ? `Se enviará al teléfono de la entidad: ${entidades.find((e) => e.docId === editForm.entidadId).phone}`
+            : "La entidad seleccionada no tiene teléfono registrado — agrégalo en Entidades para que la notificación funcione."}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={saveEdit}
+          disabled={editSaving}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "7px 14px",
+            fontSize: 13,
+            fontWeight: 500,
+            background: "var(--sage)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: editSaving ? "not-allowed" : "pointer",
+          }}
+        >
+          <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          style={{
+            padding: "7px 14px",
+            fontSize: 13,
+            fontWeight: 500,
+            background: "var(--card)",
+            color: "var(--ink-soft)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {editError && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>
+      )}
+    </div>
+  );
+
+  const renderDestinoStrip = (p) => {
+    const esPT01 = p.numero === "PT01";
+    const metodo = p.metodoPago || "Transferencia";
+    const numCuenta = p.cuentaDestinoNumero || (esPT01 ? "0002804611" : "");
+    const banco = p.cuentaDestinoBanco || (esPT01 ? "Banco Popular" : (p.entidadName || "Banco"));
+    const beneficiario = p.cuentaDestinoBeneficiario || (esPT01 ? "Julian Ochoa" : "");
+
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
+            fontSize: 10.5,
+            padding: "1px 6px",
+            borderRadius: 5,
+            background: "var(--paper)",
+            border: "1px solid var(--line)",
+            color: "var(--ink)",
+            fontWeight: 500,
+          }}
+        >
+          <ArrowLeftRight size={10} style={{ color: "var(--sage)" }} />
+          {metodo}
+        </span>
+
+        {numCuenta && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 11,
+              padding: "1px 7px",
+              borderRadius: 5,
+              background: "rgba(59, 130, 246, 0.08)",
+              border: "1px solid rgba(59, 130, 246, 0.2)",
+              color: "var(--ink)",
+            }}
+          >
+            <Landmark size={10} style={{ color: "#2563eb" }} />
+            <span>
+              <strong>{banco}:</strong> <span className="despensa-mono">{numCuenta}</span>
+              {beneficiario ? ` (${beneficiario})` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                copiarCuenta(numCuenta, p.id);
+              }}
+              title="Copiar número de cuenta destino"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
+                background: "transparent",
+                border: "none",
+                color: copiadoId === p.id ? "var(--sage)" : "#2563eb",
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "0 2px",
+              }}
+            >
+              {copiadoId === p.id ? <Check size={10} /> : <Copy size={10} />}
+              {copiadoId === p.id ? "Copiado" : "Copiar"}
+            </button>
+          </span>
+        )}
+
+        {p.acreditarEnCuenta && p.cuentaDestinoNombre && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10.5,
+              padding: "1px 7px",
+              borderRadius: 5,
+              background: "var(--sage-bg)",
+              color: "var(--sage)",
+              fontWeight: 600,
+            }}
+          >
+            <Vault size={10} />
+            Desembolso en {p.cuentaDestinoNombre}
+          </span>
+        )}
+
+        {p.notificarWhatsapp && (
+          <span
+            title={
+              entidades.find((e) => e.docId === p.entidadId)?.phone
+                ? `Notifica pagos a ${entidades.find((e) => e.docId === p.entidadId).phone}`
+                : "Notificación activa, pero la entidad no tiene teléfono registrado"
+            }
+            style={{ display: "inline-flex", alignItems: "center", color: entidades.find((e) => e.docId === p.entidadId)?.phone ? "var(--sage)" : "var(--stamp)" }}
+          >
+            <MessageCircle size={12} />
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderDetallesPanel = (p, includeDestinoAndDividir = false) => {
+    const pagado = pagadoPorPrestamo[p.id] || 0;
+    const proyeccion = calcularProyeccionPago(p, movimientos);
+
+    return (
+      <div>
+        {includeDestinoAndDividir && (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            {renderDestinoStrip(p)}
+            {p.frecuenciaCuota === "Mensual" && p.cuota > 0 && p.estado !== "Pagado" && (
+              <button
+                type="button"
+                onClick={() => abrirModalDividir(p)}
+                title={p.dividirEnQuincenas ? "Modificar división de cuota entre quincenas y escenarios" : "Dividir cuota entre Q1 y Q2 para ir más flojo"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 9px",
+                  borderRadius: 6,
+                  border: `1px solid ${p.dividirEnQuincenas ? "rgba(16, 185, 129, 0.35)" : "var(--line)"}`,
+                  background: p.dividirEnQuincenas ? "rgba(16, 185, 129, 0.12)" : "var(--card)",
+                  color: p.dividirEnQuincenas ? "var(--sage)" : "var(--ink-soft)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <Scissors size={11} />
+                {p.dividirEnQuincenas ? "Dividida Q1/Q2 (Ajustar)" : "Dividir en 2 quincenas"}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 8 }}>
+          <Field label="Plazo" value={p.plazo ? `${p.plazo} ${p.plazoUnidad || "meses"}` : "—"} />
+          <Field label="Tasa interés" value={p.tasaInteres != null ? `${p.tasaInteres}%` : "—"} />
+          <Field
+            label="Inicio"
+            value={
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Calendar size={11} /> {formatDateDisplay(p.fechaInicio)}
+              </span>
+            }
+          />
+          <Field label="Total pagado" value={<span style={{ color: "var(--sage)" }}>{formatMoney(pagado)}</span>} />
+        </div>
+
+        {proyeccion && !proyeccion.yaSaldado && (() => {
+          const fechaTexto = proyeccion.fechaProyectada.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+          let comparacion = null;
+          if (proyeccion.diasDiferencia != null) {
+            if (proyeccion.diasDiferencia > 15) {
+              comparacion = { texto: `${Math.round(proyeccion.diasDiferencia / 30)} meses más tarde de lo planeado`, color: "var(--stamp)" };
+            } else if (proyeccion.diasDiferencia < -15) {
+              comparacion = { texto: `${Math.round(Math.abs(proyeccion.diasDiferencia) / 30)} meses antes de lo planeado`, color: "var(--sage)" };
+            } else {
+              comparacion = { texto: "según lo planeado", color: "var(--ink-soft)" };
+            }
+          }
+          return (
+            <div style={{ fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.4, marginBottom: 8 }}>
+              📈 A tu ritmo actual, quedaría saldado el <strong style={{ color: "var(--ink)" }}>{fechaTexto}</strong>
+              {comparacion && (
+                <span style={{ color: comparacion.color }}> — {comparacion.texto}</span>
+              )}
+            </div>
+          );
+        })()}
+
+        <HistorialCuotasPagadas prestamo={p} movimientos={movimientos} />
+
+        {p.esRevolvente && (() => {
+          const limite = Number(p.montoAprobado) || 0;
+          const usado = Number(p.saldoActual) || 0;
+          const disponible = Math.max(limite - usado, 0);
+          const pctUsado = limite ? Math.min(100, Math.round((usado / limite) * 100)) : 0;
+          const minimoRetiro = p.montoMinimoRetiro;
+          const puedeRetirar = minimoRetiro != null ? disponible >= minimoRetiro : disponible > 0;
+          const barColor = pctUsado >= 90 ? "var(--stamp)" : pctUsado >= 60 ? "var(--amber)" : "var(--sage)";
+          const abierto = revolventeAbiertoId === p.id;
+          return (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line-soft)" }}>
+              <button
+                onClick={() => setRevolventeAbiertoId(abierto ? null : p.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontSize: 10.5,
+                  color: "var(--ink-soft)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                <RotateCcw size={11} />
+                Línea revolvente
+                {abierto ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              </button>
+
+              {abierto && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+                    <Field label="Disponible para retirar" value={<span style={{ color: puedeRetirar ? "var(--sage)" : "var(--stamp)" }}>{formatMoney(disponible)}</span>} />
+                    <Field label="Saldo utilizado" value={formatMoney(usado)} />
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: "var(--line-soft)", overflow: "hidden", marginBottom: 5 }}>
+                    <div style={{ height: "100%", width: `${pctUsado}%`, background: barColor, borderRadius: 2 }} />
+                  </div>
+                  <div
+                    className="despensa-tab-font"
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      display: "inline-block",
+                      padding: "1px 7px",
+                      borderRadius: 10,
+                      background: puedeRetirar ? "var(--sage-bg)" : "var(--stamp-bg)",
+                      color: puedeRetirar ? "var(--sage)" : "var(--stamp)",
+                    }}
+                  >
+                    {puedeRetirar
+                      ? "Puedes volver a retirar"
+                      : minimoRetiro != null
+                      ? `Necesitas pagar más (mínimo ${formatMoney(minimoRetiro)} disponible)`
+                      : "Sin disponible para retirar"}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {p.notas && (
+          <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 6, borderTop: "1px solid var(--line-soft)", paddingTop: 6 }}>
+            {p.notas}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginBottom: 18 }}>
@@ -1712,7 +2305,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => (showForm ? setShowForm(false) : openForm())}
           disabled={!showForm && entidades.length === 0}
@@ -1734,6 +2327,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar préstamo"}
         </button>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {entidades.length === 0 && !showForm && (
@@ -2123,332 +2717,187 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
             ? "Todavía no registraste ningún préstamo."
             : "No tienes préstamos activos — revisa el histórico abajo."}
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={prestamosVisibles}
+          columns={[
+            {
+              key: "numero",
+              label: "No.",
+              mono: true,
+              render: (p) => (
+                <span style={{ fontWeight: 700, color: "var(--stamp)" }}>{p.numero}</span>
+              ),
+            },
+            {
+              key: "entidad",
+              label: "Entidad / Tipo",
+              wrap: true,
+              render: (p) => (
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>
+                    {p.entidadName || "Entidad no especificada"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 1 }}>
+                    <span>{p.tipo || "Préstamo"}</span>
+                    {p.activoNombre && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        · <Car size={10} /> {p.activoNombre}
+                      </span>
+                    )}
+                    {p.notificarWhatsapp && <MessageCircle size={11} style={{ color: "var(--sage)" }} />}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: "aprobado",
+              label: "Aprobado",
+              align: "right",
+              mono: true,
+              render: (p) => formatMoney(p.montoAprobado),
+            },
+            {
+              key: "cuota",
+              label: "Cuota",
+              align: "right",
+              mono: true,
+              render: (p) => (
+                <div>
+                  <div style={{ fontWeight: 600 }}>{p.cuota != null ? formatMoney(p.cuota) : "—"}</div>
+                  {p.dividirEnQuincenas && p.cuota != null && (
+                    <div style={{ fontSize: 10, color: "var(--sage)", fontWeight: 600 }}>
+                      Q1/Q2
+                    </div>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: "pagado",
+              label: "Pagado",
+              align: "right",
+              mono: true,
+              render: (p) => (
+                <span style={{ color: "var(--sage)", fontWeight: 600 }}>
+                  {formatMoney(pagadoPorPrestamo[p.id] || 0)}
+                </span>
+              ),
+            },
+            {
+              key: "pendiente",
+              label: "Pendiente",
+              align: "right",
+              mono: true,
+              render: (p) => {
+                const pagado = pagadoPorPrestamo[p.id] || 0;
+                const pendiente = Math.max((Number(p.montoAprobado) || 0) - pagado, 0);
+                return (
+                  <span style={{ fontWeight: 700, color: pendiente > 0 ? "var(--stamp)" : "var(--sage)" }}>
+                    {formatMoney(pendiente)}
+                  </span>
+                );
+              },
+            },
+            {
+              key: "cuotas",
+              label: "Cuotas",
+              align: "center",
+              mono: true,
+              render: (p) => {
+                const cuotasInfo = obtenerInfoCuotasPrestamo(p, movimientos);
+                const pagado = pagadoPorPrestamo[p.id] || 0;
+                const pct = p.montoAprobado ? Math.min(100, Math.round((pagado / p.montoAprobado) * 100)) : 0;
+                return cuotasInfo.totalCuotas != null ? (
+                  <span>
+                    <strong style={{ color: "var(--sage)" }}>{cuotasInfo.cuotasPagadas}</strong>/{cuotasInfo.totalCuotas}{" "}
+                    <span style={{ fontSize: 10.5, color: "var(--ink-soft)" }}>({pct}%)</span>
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--ink-soft)" }}>{pct}%</span>
+                );
+              },
+            },
+            {
+              key: "estado",
+              label: "Estado",
+              align: "center",
+              render: (p) => (
+                <EstadoBadge
+                  estado={p.estado}
+                  onChange={async (estado) => {
+                    if (estado === "Pagado") {
+                      setShowHistorico(true);
+                      try {
+                        localStorage.setItem("smart-finance-prestamos-historico-open", "1");
+                      } catch {}
+                    }
+                    await updatePrestamoEstado(p.id, estado);
+                  }}
+                />
+              ),
+            },
+          ]}
+          extraActions={(p) => (
+            <>
+              {p.estado !== "Pagado" && (
+                <button
+                  type="button"
+                  onClick={() => abrirModalPago(p)}
+                  title="Registrar pago de cuota"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "5px 10px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: "none",
+                    background: "var(--sage)",
+                    color: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Wallet size={12} /> Pagar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => toggleDetalles(p.id)}
+                title={detallesAbiertos[p.id] ? "Ocultar detalles" : "Ver detalles e historial"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "5px 9px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: 6,
+                  border: "1px solid var(--line)",
+                  background: detallesAbiertos[p.id] ? "var(--line-soft)" : "var(--card)",
+                  color: "var(--ink-soft)",
+                  cursor: "pointer",
+                }}
+              >
+                {detallesAbiertos[p.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {detallesAbiertos[p.id] ? "Menos" : "Detalles"}
+              </button>
+            </>
+          )}
+          onEdit={(p) => startEdit(p)}
+          onDelete={async (p) => {
+            if (await confirm("¿Eliminar este préstamo?")) deletePrestamo(p.id);
+          }}
+          isRowExpanded={(p) => editingId === p.id || !!detallesAbiertos[p.id]}
+          renderExpandedRow={(p) => (editingId === p.id ? renderEditForm(p) : renderDetallesPanel(p, true))}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {prestamosVisibles.map((p) => (
             <div key={p.id} data-record-id={p.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
               {editingId === p.id ? (
-                <div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "0.8fr 1.5fr", gap: 8, marginBottom: 8 }}>
-                    <div className="despensa-mono" style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--paper)", color: "var(--ink-soft)" }}>
-                      {p.numero}
-                    </div>
-                    <select
-                      value={editForm.entidadId}
-                      onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      <option value="">Entidad prestamista…</option>
-                      {entidades.map((e) => (
-                        <option key={e.docId} value={e.docId}>{e.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <select
-                      value={editForm.tipo}
-                      onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {TIPOS_PRESTAMO.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {editForm.tipo === "Vehículo" && (
-                    <div style={{ marginBottom: 8 }}>
-                      {activos.filter((a) => a.tipo === "Vehículo").length === 0 ? (
-                        <div style={{ fontSize: 11.5, color: "var(--ink-soft)", padding: "4px 0" }}>
-                          No tienes vehículos registrados en Activos todavía (opcional).
-                        </div>
-                      ) : (
-                        <select
-                          value={editForm.activoId}
-                          onChange={(e) => setEditForm({ ...editForm, activoId: e.target.value })}
-                          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                        >
-                          <option value="">Vincular a un vehículo de Activos (opcional)…</option>
-                          {activos.filter((a) => a.tipo === "Vehículo").map((a) => (
-                            <option key={a.id} value={a.id}>{a.nombre}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 8, cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={editForm.esRevolvente}
-                      onChange={(e) => setEditForm({ ...editForm, esRevolvente: e.target.checked })}
-                    />
-                    Es un préstamo revolvente (al pagar, el monto queda disponible para volver a retirar)
-                  </label>
-                  {editForm.esRevolvente && (
-                    <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                      <input
-                        className="despensa-mono"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Saldo actual utilizado"
-                        value={editForm.saldoActual}
-                        onChange={(e) => setEditForm({ ...editForm, saldoActual: e.target.value })}
-                        style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                      <input
-                        className="despensa-mono"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Mínimo disponible para retirar"
-                        value={editForm.montoMinimoRetiro}
-                        onChange={(e) => setEditForm({ ...editForm, montoMinimoRetiro: e.target.value })}
-                        style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Monto aprobado"
-                      value={editForm.montoAprobado}
-                      onChange={(e) => setEditForm({ ...editForm, montoAprobado: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <input
-                        className="despensa-mono"
-                        type="number"
-                        step="1"
-                        min="0"
-                        placeholder="Plazo"
-                        value={editForm.plazo}
-                        onChange={(e) => setEditForm({ ...editForm, plazo: e.target.value })}
-                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                      <select
-                        value={editForm.plazoUnidad}
-                        onChange={(e) => setEditForm({ ...editForm, plazoUnidad: e.target.value })}
-                        style={{ padding: "8px 4px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 12, background: "var(--card)" }}
-                      >
-                        {PLAZO_UNIDADES.map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        className="despensa-mono"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Tasa interés"
-                        value={editForm.tasaInteres}
-                        onChange={(e) => setEditForm({ ...editForm, tasaInteres: e.target.value })}
-                        style={{ width: "100%", padding: "8px 22px 8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                      <Percent size={12} style={{ position: "absolute", right: 8, top: 11, color: "var(--ink-soft)" }} />
-                    </div>
-                  </div>
-
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      type="date"
-                      value={editForm.fechaInicio}
-                      onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <select
-                      value={editForm.estado}
-                      onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
-                      disabled={p.estado === "Pagado"}
-                      title={p.estado === "Pagado" ? "Este préstamo ya está saldado y no se puede revertir" : undefined}
-                      style={{
-                        padding: "8px 10px",
-                        border: "1px solid var(--line)",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        background: p.estado === "Pagado" ? "var(--line-soft)" : "var(--card)",
-                        color: p.estado === "Pagado" ? "var(--ink-soft)" : "var(--ink)",
-                        cursor: p.estado === "Pagado" ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {ESTADOS.map((e) => (
-                        <option key={e} value={e}>{e}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {p.estado === "Pagado" && (
-                    <div style={{ fontSize: 11, color: "var(--sage)", marginTop: -4, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                      <Check size={11} /> Préstamo saldado por completo — el estado ya no se puede cambiar.
-                    </div>
-                  )}
-
-                  <div style={{ marginBottom: 8 }}>
-                    <select
-                      value={editForm.frecuenciaCuota}
-                      onChange={(e) => setEditForm({ ...editForm, frecuenciaCuota: e.target.value })}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      <option value="Mensual">Cuota mensual fija (se calcula sola cada mes)</option>
-                      <option value="Personalizado">Fechas específicas (cuotas irregulares)</option>
-                    </select>
-                  </div>
-
-                  {editForm.frecuenciaCuota === "Mensual" ? (
-                    <div style={{ marginBottom: 8 }}>
-                      <input
-                        className="despensa-mono"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Cuota mensual"
-                        value={editForm.cuota}
-                        onChange={(e) => setEditForm({ ...editForm, cuota: e.target.value })}
-                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
-                      />
-                      <SeccionDividirCuota
-                        cuota={editForm.cuota}
-                        dividirEnQuincenas={editForm.dividirEnQuincenas}
-                        cuotaQ1={editForm.cuotaQ1}
-                        cuotaQ2={editForm.cuotaQ2}
-                        escenarioDivision={editForm.escenarioDivision}
-                        semestresDivision={editForm.semestresDivision}
-                        trimestresDivision={editForm.trimestresDivision}
-                        mesesDivision={editForm.mesesDivision}
-                        modoAnioDivision={editForm.modoAnioDivision}
-                        anioDivision={editForm.anioDivision}
-                        onChangeDividir={(val) => setEditForm((prev) => ({ ...prev, dividirEnQuincenas: val }))}
-                        onChangeQ1={(val) => setEditForm((prev) => ({ ...prev, cuotaQ1: val }))}
-                        onChangeQ2={(val) => setEditForm((prev) => ({ ...prev, cuotaQ2: val }))}
-                        onChangeEscenario={(val) => setEditForm((prev) => ({ ...prev, escenarioDivision: val }))}
-                        onChangeSemestres={(val) => setEditForm((prev) => ({ ...prev, semestresDivision: val }))}
-                        onChangeTrimestres={(val) => setEditForm((prev) => ({ ...prev, trimestresDivision: val }))}
-                        onChangeMeses={(val) => setEditForm((prev) => ({ ...prev, mesesDivision: val }))}
-                        onChangeModoAnio={(val) => setEditForm((prev) => ({ ...prev, modoAnioDivision: val }))}
-                        onChangeAnio={(val) => setEditForm((prev) => ({ ...prev, anioDivision: val }))}
-                      />
-                    </div>
-                  ) : (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: 6 }}>
-                        Agrega cada cuota con su fecha y monto exactos:
-                      </div>
-                      {editForm.cuotasPersonalizadas.map((c, idx) => (
-                        <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-                          <input
-                            type="date"
-                            value={c.fecha}
-                            onChange={(e) => {
-                              const list = [...editForm.cuotasPersonalizadas];
-                              list[idx] = { ...list[idx], fecha: e.target.value };
-                              setEditForm({ ...editForm, cuotasPersonalizadas: list });
-                            }}
-                            style={{ flex: 1, minWidth: 0, padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12.5 }}
-                          />
-                          <input
-                            className="despensa-mono"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Monto"
-                            value={c.monto}
-                            onChange={(e) => {
-                              const list = [...editForm.cuotasPersonalizadas];
-                              list[idx] = { ...list[idx], monto: e.target.value };
-                              setEditForm({ ...editForm, cuotasPersonalizadas: list });
-                            }}
-                            style={{ width: 90, flexShrink: 0, padding: "7px 9px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12.5 }}
-                          />
-                          <button
-                            onClick={() => setEditForm({ ...editForm, cuotasPersonalizadas: editForm.cuotasPersonalizadas.filter((_, i) => i !== idx) })}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, flexShrink: 0, background: "transparent", border: "none", color: "var(--stamp)", cursor: "pointer" }}
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => setEditForm({ ...editForm, cuotasPersonalizadas: [...editForm.cuotasPersonalizadas, { fecha: "", monto: "" }] })}
-                        style={{ fontSize: 12, color: "var(--sage)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                      >
-                        + Agregar cuota
-                      </button>
-                    </div>
-                  )}
-
-                  <SeccionCuentaDestino formState={editForm} setFormState={setEditForm} cuentas={cuentas} entidades={entidades} movimientos={movimientos} prestamos={prestamos} esNuevo={false} />
-
-                  <input
-                    placeholder="Notas (opcional)"
-                    value={editForm.notas}
-                    onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
-                  />
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 8, cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={editForm.notificarWhatsapp}
-                      onChange={(e) => setEditForm({ ...editForm, notificarWhatsapp: e.target.checked })}
-                    />
-                    Notificar pagos de este préstamo por WhatsApp
-                  </label>
-                  {editForm.notificarWhatsapp && (
-                    <div style={{ fontSize: 11.5, color: entidades.find((e) => e.docId === editForm.entidadId)?.phone ? "var(--ink-soft)" : "var(--stamp)", marginBottom: 10 }}>
-                      {entidades.find((e) => e.docId === editForm.entidadId)?.phone
-                        ? `Se enviará al teléfono de la entidad: ${entidades.find((e) => e.docId === editForm.entidadId).phone}`
-                        : "La entidad seleccionada no tiene teléfono registrado — agrégalo en Entidades para que la notificación funcione."}
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "7px 14px",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        background: "var(--sage)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 8,
-                        cursor: editSaving ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      style={{
-                        padding: "7px 14px",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        background: "var(--card)",
-                        color: "var(--ink-soft)",
-                        border: "1px solid var(--line)",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {editError && (
-                    <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>
-                  )}
-                </div>
+                renderEditForm(p)
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
@@ -2572,113 +3021,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
                     </div>
                   </div>
 
-                  {/* Fila compacta de cuenta destino */}
-                  {(() => {
-                    const esPT01 = p.numero === "PT01";
-                    const metodo = p.metodoPago || "Transferencia";
-                    const numCuenta = p.cuentaDestinoNumero || (esPT01 ? "0002804611" : "");
-                    const banco = p.cuentaDestinoBanco || (esPT01 ? "Banco Popular" : (p.entidadName || "Banco"));
-                    const beneficiario = p.cuentaDestinoBeneficiario || (esPT01 ? "Julian Ochoa" : "");
-
-                    return (
-                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 3,
-                            fontSize: 10.5,
-                            padding: "1px 6px",
-                            borderRadius: 5,
-                            background: "var(--paper)",
-                            border: "1px solid var(--line)",
-                            color: "var(--ink)",
-                            fontWeight: 500,
-                          }}
-                        >
-                          <ArrowLeftRight size={10} style={{ color: "var(--sage)" }} />
-                          {metodo}
-                        </span>
-
-                        {numCuenta && (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 5,
-                              fontSize: 11,
-                              padding: "1px 7px",
-                              borderRadius: 5,
-                              background: "rgba(59, 130, 246, 0.08)",
-                              border: "1px solid rgba(59, 130, 246, 0.2)",
-                              color: "var(--ink)",
-                            }}
-                          >
-                            <Landmark size={10} style={{ color: "#2563eb" }} />
-                            <span>
-                              <strong>{banco}:</strong> <span className="despensa-mono">{numCuenta}</span>
-                              {beneficiario ? ` (${beneficiario})` : ""}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copiarCuenta(numCuenta, p.id);
-                              }}
-                              title="Copiar número de cuenta destino"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 2,
-                                background: "transparent",
-                                border: "none",
-                                color: copiadoId === p.id ? "var(--sage)" : "#2563eb",
-                                fontSize: 10,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                padding: "0 2px",
-                              }}
-                            >
-                              {copiadoId === p.id ? <Check size={10} /> : <Copy size={10} />}
-                              {copiadoId === p.id ? "Copiado" : "Copiar"}
-                            </button>
-                          </span>
-                        )}
-
-                        {p.acreditarEnCuenta && p.cuentaDestinoNombre && (
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              fontSize: 10.5,
-                              padding: "1px 7px",
-                              borderRadius: 5,
-                              background: "var(--sage-bg)",
-                              color: "var(--sage)",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <Vault size={10} />
-                            Desembolso en {p.cuentaDestinoNombre}
-                          </span>
-                        )}
-
-                        {p.notificarWhatsapp && (
-                          <span
-                            title={
-                              entidades.find((e) => e.docId === p.entidadId)?.phone
-                                ? `Notifica pagos a ${entidades.find((e) => e.docId === p.entidadId).phone}`
-                                : "Notificación activa, pero la entidad no tiene teléfono registrado"
-                            }
-                            style={{ display: "inline-flex", alignItems: "center", color: entidades.find((e) => e.docId === p.entidadId)?.phone ? "var(--sage)" : "var(--stamp)" }}
-                          >
-                            <MessageCircle size={12} />
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {renderDestinoStrip(p)}
 
                   {/* Métricas esenciales siempre visibles en una sola fila compacta */}
                   {(() => {
@@ -2761,116 +3104,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
                         {/* Detalles secundarios plegables */}
                         {expandido && (
                           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 8 }}>
-                              <Field label="Plazo" value={p.plazo ? `${p.plazo} ${p.plazoUnidad || "meses"}` : "—"} />
-                              <Field label="Tasa interés" value={p.tasaInteres != null ? `${p.tasaInteres}%` : "—"} />
-                              <Field
-                                label="Inicio"
-                                value={
-                                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                    <Calendar size={11} /> {formatDateDisplay(p.fechaInicio)}
-                                  </span>
-                                }
-                              />
-                              <Field label="Total pagado" value={<span style={{ color: "var(--sage)" }}>{formatMoney(pagado)}</span>} />
-                            </div>
-
-                            {(() => {
-                              const proyeccion = calcularProyeccionPago(p, movimientos);
-                              if (!proyeccion || proyeccion.yaSaldado) return null;
-                              const fechaTexto = proyeccion.fechaProyectada.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
-                              let comparacion = null;
-                              if (proyeccion.diasDiferencia != null) {
-                                if (proyeccion.diasDiferencia > 15) {
-                                  comparacion = { texto: `${Math.round(proyeccion.diasDiferencia / 30)} meses más tarde de lo planeado`, color: "var(--stamp)" };
-                                } else if (proyeccion.diasDiferencia < -15) {
-                                  comparacion = { texto: `${Math.round(Math.abs(proyeccion.diasDiferencia) / 30)} meses antes de lo planeado`, color: "var(--sage)" };
-                                } else {
-                                  comparacion = { texto: "según lo planeado", color: "var(--ink-soft)" };
-                                }
-                              }
-                              return (
-                                <div style={{ fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.4, marginBottom: 8 }}>
-                                  📈 A tu ritmo actual, quedaría saldado el <strong style={{ color: "var(--ink)" }}>{fechaTexto}</strong>
-                                  {comparacion && (
-                                    <span style={{ color: comparacion.color }}> — {comparacion.texto}</span>
-                                  )}
-                                </div>
-                              );
-                            })()}
-
-                            <HistorialCuotasPagadas prestamo={p} movimientos={movimientos} />
-
-                            {p.esRevolvente && (() => {
-                              const limite = Number(p.montoAprobado) || 0;
-                              const usado = Number(p.saldoActual) || 0;
-                              const disponible = Math.max(limite - usado, 0);
-                              const pctUsado = limite ? Math.min(100, Math.round((usado / limite) * 100)) : 0;
-                              const minimoRetiro = p.montoMinimoRetiro;
-                              const puedeRetirar = minimoRetiro != null ? disponible >= minimoRetiro : disponible > 0;
-                              const barColor = pctUsado >= 90 ? "var(--stamp)" : pctUsado >= 60 ? "var(--amber)" : "var(--sage)";
-                              const abierto = revolventeAbiertoId === p.id;
-                              return (
-                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line-soft)" }}>
-                                  <button
-                                    onClick={() => setRevolventeAbiertoId(abierto ? null : p.id)}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 5,
-                                      fontSize: 10.5,
-                                      color: "var(--ink-soft)",
-                                      background: "transparent",
-                                      border: "none",
-                                      cursor: "pointer",
-                                      padding: 0,
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.03em",
-                                    }}
-                                  >
-                                    <RotateCcw size={11} />
-                                    Línea revolvente
-                                    {abierto ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                  </button>
-
-                                  {abierto && (
-                                    <div style={{ marginTop: 6 }}>
-                                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
-                                        <Field label="Disponible para retirar" value={<span style={{ color: puedeRetirar ? "var(--sage)" : "var(--stamp)" }}>{formatMoney(disponible)}</span>} />
-                                        <Field label="Saldo utilizado" value={formatMoney(usado)} />
-                                      </div>
-                                      <div style={{ height: 4, borderRadius: 2, background: "var(--line-soft)", overflow: "hidden", marginBottom: 5 }}>
-                                        <div style={{ height: "100%", width: `${pctUsado}%`, background: barColor, borderRadius: 2 }} />
-                                      </div>
-                                      <div
-                                        className="despensa-tab-font"
-                                        style={{
-                                          fontSize: 10.5,
-                                          fontWeight: 600,
-                                          display: "inline-block",
-                                          padding: "1px 7px",
-                                          borderRadius: 10,
-                                          background: puedeRetirar ? "var(--sage-bg)" : "var(--stamp-bg)",
-                                          color: puedeRetirar ? "var(--sage)" : "var(--stamp)",
-                                        }}
-                                      >
-                                        {puedeRetirar
-                                          ? "Puedes volver a retirar"
-                                          : minimoRetiro != null
-                                          ? `Necesitas pagar más (mínimo ${formatMoney(minimoRetiro)} disponible)`
-                                          : "Sin disponible para retirar"}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-
-                            {p.notas && (
-                              <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 6, borderTop: "1px solid var(--line-soft)", paddingTop: 6 }}>
-                                {p.notas}
-                              </div>
-                            )}
+                            {renderDetallesPanel(p, false)}
                           </div>
                         )}
                       </>
@@ -2909,6 +3143,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
               cursor: "pointer",
               width: "100%",
               justifyContent: "space-between",
+              marginBottom: showHistorico && vistaModo === "tabla" ? 10 : 0,
             }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2918,73 +3153,151 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
           </button>
 
           {showHistorico && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {prestamosPagados.map((p) => (
-                <div
-                  key={p.id}
-                  data-record-id={p.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    background: "var(--paper)",
-                    border: "1px solid var(--line-soft)",
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    opacity: 0.85,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--sage-bg)", color: "var(--sage)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Check size={12} />
+            vistaModo === "tabla" ? (
+              <CrudTable
+                rows={prestamosPagados}
+                columns={[
+                  {
+                    key: "numero",
+                    label: "No.",
+                    mono: true,
+                    render: (p) => <span style={{ fontWeight: 700, color: "var(--ink-soft)" }}>{p.numero}</span>,
+                  },
+                  {
+                    key: "entidad",
+                    label: "Entidad / Tipo",
+                    wrap: true,
+                    render: (p) => (
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{p.entidadName || "Sin entidad"}</div>
+                        <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{p.tipo || "Préstamo"}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "montoAprobado",
+                    label: "Monto aprobado",
+                    align: "right",
+                    mono: true,
+                    render: (p) => formatMoney(p.montoAprobado),
+                  },
+                  {
+                    key: "cuotas",
+                    label: "Cuotas saldadas",
+                    align: "center",
+                    mono: true,
+                    render: (p) => {
+                      const info = obtenerInfoCuotasPrestamo(p, movimientos);
+                      return info.totalCuotas ? `${info.totalCuotas} / ${info.totalCuotas}` : "Saldado";
+                    },
+                  },
+                  {
+                    key: "estado",
+                    label: "Estado",
+                    align: "center",
+                    render: (p) => (
+                      <EstadoBadge
+                        estado={p.estado}
+                        onChange={(nuevoEstado) => updatePrestamoEstado(p.id, nuevoEstado)}
+                      />
+                    ),
+                  },
+                ]}
+                extraActions={(p) => (
+                  <button
+                    type="button"
+                    onClick={() => toggleDetalles(p.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 3,
+                      padding: "5px 9px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                      background: detallesAbiertos[p.id] ? "var(--line-soft)" : "var(--card)",
+                      color: "var(--ink-soft)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {detallesAbiertos[p.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    {detallesAbiertos[p.id] ? "Menos" : "Historial"}
+                  </button>
+                )}
+                onEdit={(p) => startEdit(p)}
+                isRowExpanded={(p) => !!detallesAbiertos[p.id]}
+                renderExpandedRow={(p) => <HistorialCuotasPagadas prestamo={p} movimientos={movimientos} />}
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                {prestamosPagados.map((p) => (
+                  <div
+                    key={p.id}
+                    data-record-id={p.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      background: "var(--paper)",
+                      border: "1px solid var(--line-soft)",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      opacity: 0.85,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--sage-bg)", color: "var(--sage)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Check size={12} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{p.numero}</div>
+                          <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{p.entidadName || "Sin entidad"}</div>
+                          {(() => {
+                            const info = obtenerInfoCuotasPrestamo(p, movimientos);
+                            if (!info.totalCuotas) return null;
+                            return (
+                              <div style={{ fontSize: 11, color: "var(--sage)", marginTop: 2, fontWeight: 500 }}>
+                                {info.totalCuotas} de {info.totalCuotas} cuotas saldadas (0 pendientes)
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <EstadoBadge
+                          estado={p.estado}
+                          onChange={(nuevoEstado) => updatePrestamoEstado(p.id, nuevoEstado)}
+                        />
+                        <div className="despensa-mono" style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
+                          {formatMoney(p.montoAprobado)}
+                        </div>
+                        <button
+                          onClick={() => startEdit(p)}
+                          title="Editar (por ejemplo, para corregir sus cuotas)"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 24,
+                            height: 24,
+                            background: "transparent",
+                            border: "1px solid var(--line)",
+                            borderRadius: 6,
+                            color: "var(--ink-soft)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{p.numero}</div>
-                      <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{p.entidadName || "Sin entidad"}</div>
-                      {(() => {
-                        const info = obtenerInfoCuotasPrestamo(p, movimientos);
-                        if (!info.totalCuotas) return null;
-                        return (
-                          <div style={{ fontSize: 11, color: "var(--sage)", marginTop: 2, fontWeight: 500 }}>
-                            {info.totalCuotas} de {info.totalCuotas} cuotas saldadas (0 pendientes)
-                          </div>
-                        );
-                      })()}
-                    </div>
+                    <HistorialCuotasPagadas prestamo={p} movimientos={movimientos} />
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <EstadoBadge
-                      estado={p.estado}
-                      onChange={(nuevoEstado) => updatePrestamoEstado(p.id, nuevoEstado)}
-                    />
-                    <div className="despensa-mono" style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
-                      {formatMoney(p.montoAprobado)}
-                    </div>
-                    <button
-                      onClick={() => startEdit(p)}
-                      title="Editar (por ejemplo, para corregir sus cuotas)"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 24,
-                        height: 24,
-                        background: "transparent",
-                        border: "1px solid var(--line)",
-                        borderRadius: 6,
-                        color: "var(--ink-soft)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Pencil size={11} />
-                    </button>
-                  </div>
-                  </div>
-                  <HistorialCuotasPagadas prestamo={p} movimientos={movimientos} />
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}

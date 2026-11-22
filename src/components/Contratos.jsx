@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Trash2, X, FileText, Pencil, Check, Landmark } from "lucide-react";
 import { addContrato, deleteContrato, updateContratoEstado, updateContrato } from "../lib/db";
 import { confirm } from "../lib/confirm";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 export const CONTRATO_TIPOS = [
   "Electricidad",
@@ -109,6 +110,13 @@ function toEditForm(c) {
 
 export default function Contratos({ contratos, entidades, movimientos }) {
   const [showForm, setShowForm] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-contratos-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -116,6 +124,13 @@ export default function Contratos({ contratos, entidades, movimientos }) {
   const [editForm, setEditForm] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-contratos-vista", modo);
+    } catch {}
+  };
 
   const pagadoPorContrato = useMemo(() => {
     const map = {};
@@ -206,6 +221,120 @@ export default function Contratos({ contratos, entidades, movimientos }) {
     }
   };
 
+  const renderEditForm = () => (
+    <div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <select
+          value={editForm.tipo}
+          onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {CONTRATO_TIPOS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          value={editForm.entidadId}
+          onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          <option value="">Entidad (opcional)</option>
+          {entidades.map((e) => (
+            <option key={e.docId} value={e.docId}>{e.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          placeholder="No. de contrato/cuenta"
+          value={editForm.numeroContrato}
+          onChange={(e) => setEditForm({ ...editForm, numeroContrato: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          className="despensa-mono"
+          type="number"
+          step="0.01"
+          placeholder="Monto estimado"
+          value={editForm.montoEstimado}
+          onChange={(e) => setEditForm({ ...editForm, montoEstimado: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          className="despensa-mono"
+          type="number"
+          min="1"
+          max="31"
+          placeholder="Día de pago"
+          value={editForm.diaPago}
+          onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          className="despensa-mono"
+          type="number"
+          min="0"
+          max="30"
+          placeholder="Días de gracia"
+          value={editForm.diasGracia}
+          onChange={(e) => setEditForm({ ...editForm, diasGracia: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <div>
+          <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Inicio del servicio</label>
+          <input
+            type="date"
+            value={editForm.fechaInicio}
+            onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Fin del servicio (opcional)</label>
+          <input
+            type="date"
+            value={editForm.fechaFin}
+            onChange={(e) => setEditForm({ ...editForm, fechaFin: e.target.value })}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+        </div>
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <select
+          value={editForm.estado}
+          onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
+          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      <input
+        placeholder="Notas (opcional)"
+        value={editForm.notas}
+        onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={saveEdit}
+          disabled={editSaving}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
+        >
+          <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
+    </div>
+  );
+
   return (
     <div>
       {contratos.length > 0 && (
@@ -215,7 +344,7 @@ export default function Contratos({ contratos, entidades, movimientos }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => setShowForm((s) => !s)}
           style={{
@@ -235,6 +364,7 @@ export default function Contratos({ contratos, entidades, movimientos }) {
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar contrato"}
         </button>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {showForm && (
@@ -370,122 +500,76 @@ export default function Contratos({ contratos, entidades, movimientos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ningún contrato.
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={contratos}
+          columns={[
+            {
+              key: "no",
+              label: "No.",
+              mono: true,
+              render: (_c, idx) => <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>{idx + 1}</span>,
+            },
+            {
+              key: "nombre",
+              label: "Contrato / Servicio",
+              wrap: true,
+              render: (c) => (
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>{c.nombre}</div>
+                  {c.notas && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{c.notas}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "tipo",
+              label: "Tipo / Entidad",
+              render: (c) => (
+                <div>
+                  <div style={{ fontWeight: 500 }}>{c.tipo}</div>
+                  {c.entidadName && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{c.entidadName}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "monto",
+              label: "Monto est.",
+              align: "right",
+              mono: true,
+              render: (c) => (c.montoEstimado != null ? formatMoney(c.montoEstimado) : "—"),
+            },
+            {
+              key: "vence",
+              label: "Día / Vence",
+              wrap: true,
+              render: (c) => (c.diaPago ? diaEfectivoTexto(c.diaPago, c.diasGracia) : "—"),
+            },
+            {
+              key: "numeroContrato",
+              label: "No. Contrato",
+              mono: true,
+              render: (c) => c.numeroContrato || "—",
+            },
+            {
+              key: "estado",
+              label: "Estado",
+              align: "center",
+              render: (c) => <EstadoBadge estado={c.estado} onChange={(estado) => updateContratoEstado(c.id, estado)} />,
+            },
+          ]}
+          onEdit={(c) => startEdit(c)}
+          onDelete={async (c) => {
+            if (await confirm("¿Eliminar este contrato?")) deleteContrato(c.id);
+          }}
+          isRowExpanded={(c) => editingId === c.id}
+          renderExpandedRow={() => renderEditForm()}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {contratos.map((c) => (
             <div key={c.id} data-record-id={c.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
               {editingId === c.id ? (
-                <div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <select
-                      value={editForm.tipo}
-                      onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {CONTRATO_TIPOS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={editForm.entidadId}
-                      onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      <option value="">Entidad (opcional)</option>
-                      {entidades.map((e) => (
-                        <option key={e.docId} value={e.docId}>{e.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      placeholder="No. de contrato/cuenta"
-                      value={editForm.numeroContrato}
-                      onChange={(e) => setEditForm({ ...editForm, numeroContrato: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      step="0.01"
-                      placeholder="Monto estimado"
-                      value={editForm.montoEstimado}
-                      onChange={(e) => setEditForm({ ...editForm, montoEstimado: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      min="1"
-                      max="31"
-                      placeholder="Día de pago"
-                      value={editForm.diaPago}
-                      onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      min="0"
-                      max="30"
-                      placeholder="Días de gracia"
-                      value={editForm.diasGracia}
-                      onChange={(e) => setEditForm({ ...editForm, diasGracia: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <div>
-                      <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Inicio del servicio</label>
-                      <input
-                        type="date"
-                        value={editForm.fechaInicio}
-                        onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
-                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, color: "var(--ink-soft)" }}>Fin del servicio (opcional)</label>
-                      <input
-                        type="date"
-                        value={editForm.fechaFin}
-                        onChange={(e) => setEditForm({ ...editForm, fechaFin: e.target.value })}
-                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <select
-                      value={editForm.estado}
-                      onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {ESTADOS.map((e) => (
-                        <option key={e} value={e}>{e}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <input
-                    placeholder="Notas (opcional)"
-                    value={editForm.notas}
-                    onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
-                  />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
-                    >
-                      <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
-                </div>
+                renderEditForm()
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>

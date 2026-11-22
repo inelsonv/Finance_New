@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Plus, Trash2, X, Pencil, Check, Shield, Car, HeartPulse, Home, Umbrella, Calendar, Landmark, ShieldPlus } from "lucide-react";
+import { Plus, Trash2, X, Pencil, Check, Shield, Car, HeartPulse, Home, Umbrella, Calendar, Landmark, ShieldPlus, CreditCard } from "lucide-react";
 import { addSeguro, deleteSeguro, updateSeguroEstado, updateSeguro } from "../lib/db";
 import { confirm } from "../lib/confirm";
 import SeguroSaludCard, { ARS_ESTILOS, ARS_PRESETS } from "./SeguroSaludCard.jsx";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 const TIPOS = ["Vehículo", "Salud", "Vida", "Hogar/Propiedad", "Otro"];
 const ESTADOS = ["Activo", "Vencido", "Cancelado"];
@@ -89,6 +90,14 @@ function toEditForm(s) {
 
 export default function Seguros({ seguros, entidades, activos }) {
   const [showForm, setShowForm] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-seguros-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
+  const [carnetAbiertoId, setCarnetAbiertoId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -98,6 +107,13 @@ export default function Seguros({ seguros, entidades, activos }) {
   const [editSaving, setEditSaving] = useState(false);
 
   const vehiculos = useMemo(() => (activos || []).filter((a) => a.tipo === "Vehículo"), [activos]);
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-seguros-vista", modo);
+    } catch {}
+  };
 
   const startEdit = (s) => {
     setEditingId(s.id);
@@ -546,27 +562,30 @@ export default function Seguros({ seguros, entidades, activos }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <button
-          type="button"
-          onClick={() => {
-            setForm(emptyForm("Salud"));
-            setShowForm(true);
-          }}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
-        >
-          <ShieldPlus size={14} /> Agregar seguro de salud (ARS)
-        </button>
-        <button
-          onClick={() => {
-            if (!showForm) setForm(emptyForm());
-            setShowForm((s) => !s);
-          }}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer" }}
-        >
-          {showForm ? <X size={14} /> : <Plus size={14} />}
-          {showForm ? "Cancelar" : "Agregar otro seguro"}
-        </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setForm(emptyForm("Salud"));
+              setShowForm(true);
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
+          >
+            <ShieldPlus size={14} /> Agregar seguro de salud (ARS)
+          </button>
+          <button
+            onClick={() => {
+              if (!showForm) setForm(emptyForm());
+              setShowForm((s) => !s);
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer" }}
+          >
+            {showForm ? <X size={14} /> : <Plus size={14} />}
+            {showForm ? "Cancelar" : "Agregar otro seguro"}
+          </button>
+        </div>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {showForm && renderForm(form, setForm, handleAdd, saving, formError, null, false)}
@@ -575,6 +594,137 @@ export default function Seguros({ seguros, entidades, activos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no tienes seguros registrados. Agrega tu seguro de salud (ARS y plástico digital), vehículo, vida, hogar o cualquier otro.
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={seguros}
+          columns={[
+            {
+              key: "no",
+              label: "No.",
+              mono: true,
+              render: (_s, idx) => <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>{idx + 1}</span>,
+            },
+            {
+              key: "nombre",
+              label: "Seguro / ARS",
+              wrap: true,
+              render: (s) => (
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>{s.nombre}</div>
+                  <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>
+                    {s.arsNombre || s.entidadName || s.activoNombre || "Sin aseguradora"}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: "tipo",
+              label: "Tipo / Plan",
+              render: (s) => (
+                <div>
+                  <span style={{ fontWeight: 500 }}>{s.tipo}</span>
+                  {s.planNombre && <div style={{ fontSize: 11, color: "var(--sage)" }}>{s.planNombre}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "poliza",
+              label: "Póliza / Carnet",
+              mono: true,
+              render: (s) => (
+                <div>
+                  <div>{s.numeroAfiliado || s.numeroPoliza || "—"}</div>
+                  {s.nss && <div style={{ fontSize: 10.5, color: "var(--ink-soft)" }}>NSS: {s.nss}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "prima",
+              label: "Prima",
+              align: "right",
+              mono: true,
+              render: (s) =>
+                s.primaMonto != null ? (
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{formatMoney(s.primaMonto)}</div>
+                    <div style={{ fontSize: 10.5, color: "var(--ink-soft)" }}>{s.primaFrecuencia}</div>
+                  </div>
+                ) : (
+                  "—"
+                ),
+            },
+            {
+              key: "vigencia",
+              label: "Vigencia",
+              mono: true,
+              render: (s) => {
+                const dias = diasHasta(s.fechaVencimiento);
+                return (
+                  <div>
+                    <div>{s.fechaVencimiento ? formatDateDisplay(s.fechaVencimiento) : "—"}</div>
+                    {s.estado === "Activo" && dias != null && (
+                      <div style={{ fontSize: 10.5, color: dias <= (s.diasAviso ?? 15) ? "var(--stamp)" : "var(--ink-soft)" }}>
+                        {dias < 0 ? "Vencido" : `en ${dias}d`}
+                      </div>
+                    )}
+                  </div>
+                );
+              },
+            },
+            {
+              key: "estado",
+              label: "Estado",
+              align: "center",
+              render: (s) => <EstadoBadge estado={s.estado} onChange={(estado) => updateSeguroEstado(s.id, estado)} />,
+            },
+          ]}
+          extraActions={(s) =>
+            s.tipo === "Salud" ? (
+              <button
+                type="button"
+                onClick={() => setCarnetAbiertoId((prev) => (prev === s.id ? null : s.id))}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "5px 9px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: "1px solid var(--line)",
+                  background: carnetAbiertoId === s.id ? "var(--sage-bg)" : "var(--card)",
+                  color: carnetAbiertoId === s.id ? "var(--sage)" : "var(--ink)",
+                  cursor: "pointer",
+                }}
+              >
+                <CreditCard size={12} />
+                {carnetAbiertoId === s.id ? "Ocultar" : "Plástico"}
+              </button>
+            ) : null
+          }
+          onEdit={(s) => startEdit(s)}
+          onDelete={async (s) => {
+            if (await confirm("¿Eliminar este seguro?")) deleteSeguro(s.id);
+          }}
+          isRowExpanded={(s) => editingId === s.id || carnetAbiertoId === s.id}
+          renderExpandedRow={(s) =>
+            editingId === s.id ? (
+              renderForm(editForm, setEditForm, saveEdit, editSaving, editError, cancelEdit, true)
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, alignItems: "center" }}>
+                <SeguroSaludCard seguro={s} interactive />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+                  <Field label="ARS" value={s.arsNombre || s.entidadName || "—"} />
+                  <Field label="Plan" value={s.planNombre || "—"} />
+                  <Field label="No. Afiliado / Carnet" value={s.numeroAfiliado || "—"} />
+                  <Field label="NSS" value={s.nss || "—"} />
+                  <Field label="Tel. autorizaciones" value={s.telefonoAutorizaciones || "—"} />
+                  {s.dependientes && <Field label="Dependientes" value={s.dependientes} />}
+                </div>
+              </div>
+            )
+          }
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {seguros.map((s) => {

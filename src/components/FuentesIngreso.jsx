@@ -3,6 +3,7 @@ import { Plus, Trash2, X, Briefcase, Pencil, Check, Landmark, Gift } from "lucid
 import { addFuenteIngreso, deleteFuenteIngreso, updateFuenteIngresoEstado, updateFuenteIngreso, addIngresoPuntual, deleteIngresoPuntual, marcarIngresoPuntualRecibido } from "../lib/db";
 import { calcularDeduccionesLey } from "../lib/deduccionesLey";
 import { confirm } from "../lib/confirm";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 export const FUENTE_TIPOS = ["Salario", "Freelance", "Negocio propio", "Renta", "Otro"];
 const TIPOS_INGRESO_PUNTUAL = ["Bonificación", "Regalía Pascual", "Bono Vacacional", "Comisión", "Otro"];
@@ -52,6 +53,14 @@ function toEditForm(f) {
 
 export default function FuentesIngreso({ fuentes, entidades, movimientos, ingresosPuntuales }) {
   const [showForm, setShowForm] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-ingresos-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
+  const [bonosAbiertoId, setBonosAbiertoId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -59,6 +68,13 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
   const [editForm, setEditForm] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-ingresos-vista", modo);
+    } catch {}
+  };
 
   const [agregandoPuntualId, setAgregandoPuntualId] = useState(null);
   const [puntualTipo, setPuntualTipo] = useState(TIPOS_INGRESO_PUNTUAL[0]);
@@ -212,6 +228,256 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
     }
   };
 
+  const renderEditForm = () => (
+    <div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <select
+          value={editForm.tipo}
+          onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {FUENTE_TIPOS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          value={editForm.entidadId}
+          onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          <option value="">Entidad (opcional)</option>
+          {entidades.map((e) => (
+            <option key={e.docId} value={e.docId}>{e.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          className="despensa-mono"
+          type="number"
+          step="0.01"
+          placeholder="Monto por pago"
+          value={editForm.montoEsperado}
+          onChange={(e) => setEditForm({ ...editForm, montoEsperado: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <select
+          value={editForm.frecuencia}
+          onChange={(e) => setEditForm({ ...editForm, frecuencia: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {FRECUENCIAS_INGRESO.map((fr) => (
+            <option key={fr} value={fr}>{fr}</option>
+          ))}
+        </select>
+        <input
+          placeholder="Día(s) de pago"
+          value={editForm.diaPago}
+          onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <select
+          value={editForm.estado}
+          onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
+          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--ink-soft)", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={editForm.aplicaDeduccionesLey}
+            onChange={(e) => setEditForm({ ...editForm, aplicaDeduccionesLey: e.target.checked })}
+          />
+          Este ingreso tiene deducciones de ley (AFP, SFS, ISR) — el monto de arriba es bruto
+        </label>
+        {editForm.aplicaDeduccionesLey &&
+          (() => {
+            const monto = parseFloat(editForm.montoEsperado);
+            if (!Number.isFinite(monto) || monto <= 0) return null;
+            const factor = { Semanal: 52 / 12, Quincenal: 2, Mensual: 1, Anual: 1 / 12, Único: 0 }[editForm.frecuencia] ?? 1;
+            const bruto = monto * factor;
+            const { afp, sfs, isr, neto } = calcularDeduccionesLey(bruto);
+            const netoPorPago = factor > 0 ? neto / factor : neto;
+            return (
+              <div style={{ fontSize: 11, color: "var(--sage)", marginTop: 6, lineHeight: 1.5 }}>
+                AFP: {formatMoney(afp / (factor || 1))} · SFS: {formatMoney(sfs / (factor || 1))} · ISR: {formatMoney(isr / (factor || 1))}
+                <br />
+                Neto estimado por pago: <strong>{formatMoney(netoPorPago)}</strong>
+              </div>
+            );
+          })()}
+      </div>
+      <input
+        placeholder="Código de empleado (opcional)"
+        value={editForm.codigoEmpleado}
+        onChange={(e) => setEditForm({ ...editForm, codigoEmpleado: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
+      />
+      <input
+        className="despensa-mono"
+        type="number"
+        min="0"
+        placeholder="Días de vacaciones al año (opcional)"
+        value={editForm.diasVacacionesAnuales}
+        onChange={(e) => setEditForm({ ...editForm, diasVacacionesAnuales: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
+      />
+      <input
+        placeholder="Notas (opcional)"
+        value={editForm.notas}
+        onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={saveEdit}
+          disabled={editSaving}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
+        >
+          <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
+    </div>
+  );
+
+  const renderPuntualesPanel = (f) => (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <span className="despensa-tab-font" style={{ fontSize: 11, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.03em", display: "flex", alignItems: "center", gap: 4 }}>
+          <Gift size={11} /> Ingresos puntuales
+        </span>
+        <button
+          onClick={() => (agregandoPuntualId === f.id ? setAgregandoPuntualId(null) : abrirAgregarPuntual(f.id))}
+          style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--sage)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          {agregandoPuntualId === f.id ? <X size={11} /> : <Plus size={11} />}
+          {agregandoPuntualId === f.id ? "Cancelar" : "Agregar"}
+        </button>
+      </div>
+
+      {agregandoPuntualId === f.id && (
+        <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 8, padding: 10, marginBottom: 8 }}>
+          <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 6, marginBottom: 6 }}>
+            <select
+              value={puntualTipo}
+              onChange={(e) => setPuntualTipo(e.target.value)}
+              style={{ padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, background: "var(--card)" }}
+            >
+              {TIPOS_INGRESO_PUNTUAL.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <input
+              className="despensa-mono"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Monto"
+              value={puntualMonto}
+              onChange={(e) => setPuntualMonto(e.target.value)}
+              style={{ padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12 }}
+            />
+          </div>
+          <input
+            type="date"
+            value={puntualFecha}
+            onChange={(e) => setPuntualFecha(e.target.value)}
+            style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, marginBottom: 6 }}
+          />
+          <input
+            placeholder="Notas (opcional)"
+            value={puntualNotas}
+            onChange={(e) => setPuntualNotas(e.target.value)}
+            style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, marginBottom: 8 }}
+          />
+          <button
+            onClick={() => guardarPuntual(f)}
+            disabled={puntualSaving}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: puntualSaving ? "not-allowed" : "pointer" }}
+          >
+            <Check size={12} /> {puntualSaving ? "Guardando…" : "Guardar"}
+          </button>
+          {puntualError && <div style={{ marginTop: 6, fontSize: 11, color: "var(--stamp)" }}>{puntualError}</div>}
+        </div>
+      )}
+
+      {(puntualesPorFuente[f.id] || []).length === 0 ? (
+        <div style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>Sin ingresos puntuales registrados.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {puntualesPorFuente[f.id].map((ip) => (
+            <div
+              key={ip.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "6px 8px",
+                background: "var(--card)",
+                border: "1px solid var(--line-soft)",
+                borderRadius: 7,
+                opacity: ip.recibido ? 0.7 : 1,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>
+                  {ip.tipo}
+                  {ip.recibido && (
+                    <span className="despensa-mono" style={{ marginLeft: 5, fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 8, background: "var(--sage-bg)", color: "var(--sage)" }}>
+                      Recibido
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-soft)" }}>{formatDateDisplay(ip.fecha)}{ip.notas && ` · ${ip.notas}`}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span className="despensa-mono" style={{ fontSize: 12.5, fontWeight: 600, color: ip.recibido ? "var(--sage)" : "var(--ink)" }}>
+                  {formatMoney(ip.monto)}
+                </span>
+                {!ip.recibido && (
+                  <>
+                    <button
+                      onClick={() => recibirPuntual(ip)}
+                      disabled={recibiendoId === ip.id}
+                      title="Marcar como recibido y registrar el ingreso"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", color: "var(--sage)", border: "none", borderRadius: 5, cursor: "pointer" }}
+                    >
+                      <Check size={13} />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (await confirm(`¿Eliminar este ingreso puntual (${ip.tipo})?`)) deleteIngresoPuntual(ip.id);
+                      }}
+                      title="Eliminar"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", color: "var(--stamp)", border: "none", borderRadius: 5, cursor: "pointer" }}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div>
       {fuentes.length > 0 && (
@@ -221,7 +487,7 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => setShowForm((s) => !s)}
           style={{
@@ -241,6 +507,7 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar fuente de ingreso"}
         </button>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {showForm && (
@@ -391,134 +658,105 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ninguna fuente de ingreso.
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={fuentes}
+          columns={[
+            {
+              key: "no",
+              label: "No.",
+              mono: true,
+              render: (_f, idx) => <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>{idx + 1}</span>,
+            },
+            {
+              key: "nombre",
+              label: "Fuente / Entidad",
+              wrap: true,
+              render: (f) => (
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>{f.nombre}</div>
+                  {f.entidadName && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{f.entidadName}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "tipo",
+              label: "Tipo",
+              render: (f) => f.tipo,
+            },
+            {
+              key: "monto",
+              label: "Monto por pago",
+              align: "right",
+              mono: true,
+              render: (f) => (
+                <span style={{ fontWeight: 600, color: "var(--sage)" }}>
+                  {f.montoEsperado != null ? formatMoney(f.montoEsperado) : "—"}
+                </span>
+              ),
+            },
+            {
+              key: "frecuencia",
+              label: "Frecuencia / Día",
+              render: (f) => (
+                <div>
+                  <div>{f.frecuencia || "—"}</div>
+                  {f.diaPago && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>Día(s) {f.diaPago}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "recibido",
+              label: "Recibido",
+              align: "right",
+              mono: true,
+              render: (f) => (recibidoPorFuente[f.id] > 0 ? formatMoney(recibidoPorFuente[f.id]) : "—"),
+            },
+            {
+              key: "estado",
+              label: "Estado",
+              align: "center",
+              render: (f) => <EstadoBadge estado={f.estado} onChange={(estado) => updateFuenteIngresoEstado(f.id, estado)} />,
+            },
+          ]}
+          extraActions={(f) => {
+            const cant = (puntualesPorFuente[f.id] || []).length;
+            const abierto = bonosAbiertoId === f.id;
+            return (
+              <button
+                type="button"
+                onClick={() => setBonosAbiertoId((prev) => (prev === f.id ? null : f.id))}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "5px 9px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  borderRadius: 6,
+                  border: "1px solid var(--line)",
+                  background: abierto ? "var(--sage-bg)" : "var(--card)",
+                  color: abierto ? "var(--sage)" : "var(--ink-soft)",
+                  cursor: "pointer",
+                }}
+              >
+                <Gift size={12} /> Bonos{cant > 0 ? ` (${cant})` : ""}
+              </button>
+            );
+          }}
+          onEdit={(f) => startEdit(f)}
+          onDelete={async (f) => {
+            if (await confirm("¿Eliminar esta fuente de ingreso?")) deleteFuenteIngreso(f.id);
+          }}
+          isRowExpanded={(f) => editingId === f.id || bonosAbiertoId === f.id}
+          renderExpandedRow={(f) => (editingId === f.id ? renderEditForm() : renderPuntualesPanel(f))}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {fuentes.map((f) => (
             <div key={f.id} data-record-id={f.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
               {editingId === f.id ? (
-                <div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <select
-                      value={editForm.tipo}
-                      onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {FUENTE_TIPOS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={editForm.entidadId}
-                      onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      <option value="">Entidad (opcional)</option>
-                      {entidades.map((e) => (
-                        <option key={e.docId} value={e.docId}>{e.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      step="0.01"
-                      placeholder="Monto por pago"
-                      value={editForm.montoEsperado}
-                      onChange={(e) => setEditForm({ ...editForm, montoEsperado: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <select
-                      value={editForm.frecuencia}
-                      onChange={(e) => setEditForm({ ...editForm, frecuencia: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {FRECUENCIAS_INGRESO.map((fr) => (
-                        <option key={fr} value={fr}>{fr}</option>
-                      ))}
-                    </select>
-                    <input
-                      placeholder="Día(s) de pago"
-                      value={editForm.diaPago}
-                      onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <select
-                      value={editForm.estado}
-                      onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
-                      style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {ESTADOS.map((e) => (
-                        <option key={e} value={e}>{e}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--ink-soft)", cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={editForm.aplicaDeduccionesLey}
-                        onChange={(e) => setEditForm({ ...editForm, aplicaDeduccionesLey: e.target.checked })}
-                      />
-                      Este ingreso tiene deducciones de ley (AFP, SFS, ISR) — el monto de arriba es bruto
-                    </label>
-                    {editForm.aplicaDeduccionesLey &&
-                      (() => {
-                        const monto = parseFloat(editForm.montoEsperado);
-                        if (!Number.isFinite(monto) || monto <= 0) return null;
-                        const factor = { Semanal: 52 / 12, Quincenal: 2, Mensual: 1, Anual: 1 / 12, Único: 0 }[editForm.frecuencia] ?? 1;
-                        const bruto = monto * factor;
-                        const { afp, sfs, isr, neto } = calcularDeduccionesLey(bruto);
-                        const netoPorPago = factor > 0 ? neto / factor : neto;
-                        return (
-                          <div style={{ fontSize: 11, color: "var(--sage)", marginTop: 6, lineHeight: 1.5 }}>
-                            AFP: {formatMoney(afp / (factor || 1))} · SFS: {formatMoney(sfs / (factor || 1))} · ISR: {formatMoney(isr / (factor || 1))}
-                            <br />
-                            Neto estimado por pago: <strong>{formatMoney(netoPorPago)}</strong>
-                          </div>
-                        );
-                      })()}
-                  </div>
-                  <input
-                    placeholder="Código de empleado (opcional)"
-                    value={editForm.codigoEmpleado}
-                    onChange={(e) => setEditForm({ ...editForm, codigoEmpleado: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
-                  />
-                  <input
-                    className="despensa-mono"
-                    type="number"
-                    min="0"
-                    placeholder="Días de vacaciones al año (opcional)"
-                    value={editForm.diasVacacionesAnuales}
-                    onChange={(e) => setEditForm({ ...editForm, diasVacacionesAnuales: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
-                  />
-                  <input
-                    placeholder="Notas (opcional)"
-                    value={editForm.notas}
-                    onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
-                  />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
-                    >
-                      <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
-                </div>
+                renderEditForm()
               ) : (
                 <>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
@@ -577,124 +815,7 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
                   )}
 
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span className="despensa-tab-font" style={{ fontSize: 11, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.03em", display: "flex", alignItems: "center", gap: 4 }}>
-                        <Gift size={11} /> Ingresos puntuales
-                      </span>
-                      <button
-                        onClick={() => (agregandoPuntualId === f.id ? setAgregandoPuntualId(null) : abrirAgregarPuntual(f.id))}
-                        style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--sage)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                      >
-                        {agregandoPuntualId === f.id ? <X size={11} /> : <Plus size={11} />}
-                        {agregandoPuntualId === f.id ? "Cancelar" : "Agregar"}
-                      </button>
-                    </div>
-
-                    {agregandoPuntualId === f.id && (
-                      <div style={{ background: "var(--paper)", border: "1px solid var(--line)", borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                        <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 6, marginBottom: 6 }}>
-                          <select
-                            value={puntualTipo}
-                            onChange={(e) => setPuntualTipo(e.target.value)}
-                            style={{ padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, background: "var(--card)" }}
-                          >
-                            {TIPOS_INGRESO_PUNTUAL.map((t) => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          <input
-                            className="despensa-mono"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Monto"
-                            value={puntualMonto}
-                            onChange={(e) => setPuntualMonto(e.target.value)}
-                            style={{ padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12 }}
-                          />
-                        </div>
-                        <input
-                          type="date"
-                          value={puntualFecha}
-                          onChange={(e) => setPuntualFecha(e.target.value)}
-                          style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, marginBottom: 6 }}
-                        />
-                        <input
-                          placeholder="Notas (opcional)"
-                          value={puntualNotas}
-                          onChange={(e) => setPuntualNotas(e.target.value)}
-                          style={{ width: "100%", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: 7, fontSize: 12, marginBottom: 8 }}
-                        />
-                        <button
-                          onClick={() => guardarPuntual(f)}
-                          disabled={puntualSaving}
-                          style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", fontSize: 12, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 7, cursor: puntualSaving ? "not-allowed" : "pointer" }}
-                        >
-                          <Check size={12} /> {puntualSaving ? "Guardando…" : "Guardar"}
-                        </button>
-                        {puntualError && <div style={{ marginTop: 6, fontSize: 11, color: "var(--stamp)" }}>{puntualError}</div>}
-                      </div>
-                    )}
-
-                    {(puntualesPorFuente[f.id] || []).length === 0 ? (
-                      <div style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>Sin ingresos puntuales registrados.</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {puntualesPorFuente[f.id].map((ip) => (
-                          <div
-                            key={ip.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 8,
-                              padding: "6px 8px",
-                              background: "var(--paper)",
-                              borderRadius: 7,
-                              opacity: ip.recibido ? 0.7 : 1,
-                            }}
-                          >
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 500 }}>
-                                {ip.tipo}
-                                {ip.recibido && (
-                                  <span className="despensa-mono" style={{ marginLeft: 5, fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 8, background: "var(--sage-bg)", color: "var(--sage)" }}>
-                                    Recibido
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: 10.5, color: "var(--ink-soft)" }}>{formatDateDisplay(ip.fecha)}{ip.notas && ` · ${ip.notas}`}</div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                              <span className="despensa-mono" style={{ fontSize: 12.5, fontWeight: 600, color: ip.recibido ? "var(--sage)" : "var(--ink)" }}>
-                                {formatMoney(ip.monto)}
-                              </span>
-                              {!ip.recibido && (
-                                <>
-                                  <button
-                                    onClick={() => recibirPuntual(ip)}
-                                    disabled={recibiendoId === ip.id}
-                                    title="Marcar como recibido y registrar el ingreso"
-                                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", color: "var(--sage)", border: "none", borderRadius: 5, cursor: "pointer" }}
-                                  >
-                                    <Check size={13} />
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (await confirm(`¿Eliminar este ingreso puntual (${ip.tipo})?`)) deleteIngresoPuntual(ip.id);
-                                    }}
-                                    title="Eliminar"
-                                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "transparent", color: "var(--stamp)", border: "none", borderRadius: 5, cursor: "pointer" }}
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {renderPuntualesPanel(f)}
                   </div>
                 </>
               )}

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Trash2, X, Pencil, Check, Calendar, Sparkles, Bell, AlertTriangle, Clock } from "lucide-react";
 import { addMembresia, deleteMembresia, updateMembresiaEstado, updateMembresia } from "../lib/db";
 import { confirm } from "../lib/confirm";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 export const MEMBRESIA_TIPOS = ["Software / IA", "Streaming", "Gimnasio", "Club de compras", "Salud", "Otro"];
 const FRECUENCIAS = ["Mensual", "Trimestral", "Semestral", "Anual"];
@@ -149,6 +150,13 @@ function toEditForm(m) {
 
 export default function Membresias({ membresias, entidades, movimientos }) {
   const [showForm, setShowForm] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-membresias-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -156,6 +164,13 @@ export default function Membresias({ membresias, entidades, movimientos }) {
   const [editForm, setEditForm] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-membresias-vista", modo);
+    } catch {}
+  };
 
   const pagadoPorMembresia = useMemo(() => {
     const map = {};
@@ -270,10 +285,175 @@ export default function Membresias({ membresias, entidades, movimientos }) {
     });
   }, [membresias]);
 
+  const renderEditForm = () => (
+    <div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          placeholder="Nombre, ej. Google Gemini, Netflix"
+          value={editForm.nombre}
+          onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <select
+          value={editForm.tipo}
+          onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {MEMBRESIA_TIPOS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <select
+          value={editForm.color}
+          onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {Object.entries(COLORES).map(([key, c]) => (
+            <option key={key} value={key}>{c.label}</option>
+          ))}
+        </select>
+        <input
+          placeholder="Nivel, ej. Diamond, Gold, Pro"
+          value={editForm.nivel}
+          onChange={(e) => setEditForm({ ...editForm, nivel: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <select
+          value={editForm.entidadId}
+          onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          <option value="">Entidad (opcional)</option>
+          {entidades.map((e) => (
+            <option key={e.docId} value={e.docId}>{e.name}</option>
+          ))}
+        </select>
+        <select
+          value={editForm.frecuencia}
+          onChange={(e) => setEditForm({ ...editForm, frecuencia: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {FRECUENCIAS.map((f) => (
+            <option key={f} value={f}>{f}</option>
+          ))}
+        </select>
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          className="despensa-mono"
+          type="number"
+          step="0.01"
+          placeholder="Costo"
+          value={editForm.costo}
+          onChange={(e) => setEditForm({ ...editForm, costo: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          className="despensa-mono"
+          type="number"
+          min="1"
+          max="31"
+          placeholder="Día de pago"
+          value={editForm.diaPago}
+          onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <select
+          value={editForm.estado}
+          onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 8 }}>
+        <div>
+          <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Fecha de inicio</label>
+          <input
+            type="date"
+            value={editForm.fechaInicio}
+            onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+        </div>
+      </div>
+
+      {/* Edición de fecha de expiración y alertas */}
+      <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 10, marginTop: 6, marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+          <Bell size={12} /> Expiración del plan y alertas
+        </div>
+        <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 8, marginBottom: 6 }}>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Fecha de expiración / fin</label>
+            <input
+              type="date"
+              value={editForm.fechaExpiracion}
+              onChange={(e) => setEditForm({ ...editForm, fechaExpiracion: e.target.value })}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Avisar con anticipación</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                className="despensa-mono"
+                type="number"
+                min="1"
+                max="60"
+                placeholder="5"
+                value={editForm.diasAvisoExpiracion}
+                onChange={(e) => setEditForm({ ...editForm, diasAvisoExpiracion: e.target.value })}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+              />
+              <span style={{ fontSize: 12, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>días antes</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.4 }}>
+          {editForm.fechaExpiracion ? (
+            <>🔔 Recibirás una alerta en la campana de notificaciones <strong>{editForm.diasAvisoExpiracion || 5} días antes</strong> del {formatDateDisplay(editForm.fechaExpiracion)}.</>
+          ) : (
+            <>Sin fecha de expiración fijada. Puedes asignarle una para recibir recordatorios antes de que venza.</>
+          )}
+        </div>
+      </div>
+
+      <input
+        placeholder="Notas (opcional)"
+        value={editForm.notas}
+        onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
+      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={saveEdit}
+          disabled={editSaving}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
+        >
+          <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
+    </div>
+  );
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      {(membresias.length > 0 || porExpirar.length > 0) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
           {membresias.length > 0 && (
             <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "8px 12px", display: "inline-flex", gap: 6, alignItems: "baseline" }}>
               <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>Costo mensual estimado (activas):</span>
@@ -287,7 +467,9 @@ export default function Membresias({ membresias, entidades, movimientos }) {
             </div>
           )}
         </div>
+      )}
 
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button
           onClick={() => setShowForm((s) => !s)}
           style={{
@@ -307,6 +489,7 @@ export default function Membresias({ membresias, entidades, movimientos }) {
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar membresía / suscripción"}
         </button>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {showForm && (
@@ -488,173 +671,96 @@ export default function Membresias({ membresias, entidades, movimientos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ninguna membresía o suscripción.
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={membresias}
+          columns={[
+            {
+              key: "no",
+              label: "No.",
+              mono: true,
+              render: (_m, idx) => <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>{idx + 1}</span>,
+            },
+            {
+              key: "nombre",
+              label: "Membresía / Plan",
+              wrap: true,
+              render: (m) => {
+                const c = COLORES[m.color] || COLORES.azul;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: 3, background: c.bg, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600, color: "var(--ink)" }}>
+                        {m.nombre}{m.nivel ? <span style={{ fontSize: 11, color: "var(--sage)", fontWeight: 600 }}> · {m.nivel}</span> : ""}
+                      </div>
+                      {m.entidadName && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{m.entidadName}</div>}
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: "tipo",
+              label: "Categoría",
+              render: (m) => m.tipo,
+            },
+            {
+              key: "costo",
+              label: "Costo",
+              align: "right",
+              mono: true,
+              render: (m) => (m.costo != null ? formatMoney(m.costo) : "—"),
+            },
+            {
+              key: "frecuencia",
+              label: "Frecuencia / Día",
+              render: (m) => (
+                <div>
+                  <div>{m.frecuencia || "—"}</div>
+                  {m.diaPago && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>Día {m.diaPago}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "expiracion",
+              label: "Expiración",
+              mono: true,
+              render: (m) => {
+                if (!m.fechaExpiracion) return <span style={{ color: "var(--ink-soft)" }}>—</span>;
+                const dias = diasHastaFecha(m.fechaExpiracion);
+                const umbral = m.diasAvisoExpiracion != null ? Number(m.diasAvisoExpiracion) : 5;
+                const alertaColor = dias != null && dias <= 0 ? "var(--stamp)" : dias != null && dias <= umbral ? "var(--amber)" : "var(--ink-soft)";
+                return (
+                  <div>
+                    <div>{formatDateDisplay(m.fechaExpiracion)}</div>
+                    <div style={{ fontSize: 10.5, color: alertaColor, fontWeight: 600 }}>
+                      {dias < 0 ? `hace ${Math.abs(dias)}d` : dias === 0 ? "¡Hoy!" : `en ${dias}d`}
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: "estado",
+              label: "Estado",
+              align: "center",
+              render: (m) => <EstadoBadge estado={m.estado} onChange={(estado) => updateMembresiaEstado(m.id, estado)} />,
+            },
+          ]}
+          onEdit={(m) => startEdit(m)}
+          onDelete={async (m) => {
+            if (await confirm("¿Eliminar esta membresía o suscripción?")) deleteMembresia(m.id);
+          }}
+          isRowExpanded={(m) => editingId === m.id}
+          renderExpandedRow={() => renderEditForm()}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {membresias.map((m) => (
             <div key={m.id} data-record-id={m.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
               {editingId === m.id ? (
-                <div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      placeholder="Nombre, ej. Google Gemini, Netflix"
-                      value={editForm.nombre}
-                      onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <select
-                      value={editForm.tipo}
-                      onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {MEMBRESIA_TIPOS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <select
-                      value={editForm.color}
-                      onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {Object.entries(COLORES).map(([key, c]) => (
-                        <option key={key} value={key}>{c.label}</option>
-                      ))}
-                    </select>
-                    <input
-                      placeholder="Nivel, ej. Diamond, Gold, Pro"
-                      value={editForm.nivel}
-                      onChange={(e) => setEditForm({ ...editForm, nivel: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <select
-                      value={editForm.entidadId}
-                      onChange={(e) => setEditForm({ ...editForm, entidadId: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      <option value="">Entidad (opcional)</option>
-                      {entidades.map((e) => (
-                        <option key={e.docId} value={e.docId}>{e.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={editForm.frecuencia}
-                      onChange={(e) => setEditForm({ ...editForm, frecuencia: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {FRECUENCIAS.map((f) => (
-                        <option key={f} value={f}>{f}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      step="0.01"
-                      placeholder="Costo"
-                      value={editForm.costo}
-                      onChange={(e) => setEditForm({ ...editForm, costo: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <input
-                      className="despensa-mono"
-                      type="number"
-                      min="1"
-                      max="31"
-                      placeholder="Día de pago"
-                      value={editForm.diaPago}
-                      onChange={(e) => setEditForm({ ...editForm, diaPago: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <select
-                      value={editForm.estado}
-                      onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {ESTADOS.map((e) => (
-                        <option key={e} value={e}>{e}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 8 }}>
-                    <div>
-                      <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Fecha de inicio</label>
-                      <input
-                        type="date"
-                        value={editForm.fechaInicio}
-                        onChange={(e) => setEditForm({ ...editForm, fechaInicio: e.target.value })}
-                        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Edición de fecha de expiración y alertas */}
-                  <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 10, marginTop: 6, marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
-                      <Bell size={12} /> Expiración del plan y alertas
-                    </div>
-                    <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 8, marginBottom: 6 }}>
-                      <div>
-                        <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Fecha de expiración / fin</label>
-                        <input
-                          type="date"
-                          value={editForm.fechaExpiracion}
-                          onChange={(e) => setEditForm({ ...editForm, fechaExpiracion: e.target.value })}
-                          style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, color: "var(--ink-soft)", display: "block", marginBottom: 3 }}>Avisar con anticipación</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <input
-                            className="despensa-mono"
-                            type="number"
-                            min="1"
-                            max="60"
-                            placeholder="5"
-                            value={editForm.diasAvisoExpiracion}
-                            onChange={(e) => setEditForm({ ...editForm, diasAvisoExpiracion: e.target.value })}
-                            style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                          />
-                          <span style={{ fontSize: 12, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>días antes</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.4 }}>
-                      {editForm.fechaExpiracion ? (
-                        <>🔔 Recibirás una alerta en la campana de notificaciones <strong>{editForm.diasAvisoExpiracion || 5} días antes</strong> del {formatDateDisplay(editForm.fechaExpiracion)}.</>
-                      ) : (
-                        <>Sin fecha de expiración fijada. Puedes asignarle una para recibir recordatorios antes de que venza.</>
-                      )}
-                    </div>
-                  </div>
-
-                  <input
-                    placeholder="Notas (opcional)"
-                    value={editForm.notas}
-                    onChange={(e) => setEditForm({ ...editForm, notas: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
-                  />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
-                    >
-                      <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
-                </div>
+                renderEditForm()
               ) : (
                 <>
                   <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 12 }}>
