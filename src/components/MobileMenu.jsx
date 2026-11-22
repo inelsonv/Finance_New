@@ -84,23 +84,24 @@ export default function MobileMenu({ tab, setTab, onClose, onSignOut, isOwner = 
               <button
                 key={item.id}
                 onClick={() => irA(item.id)}
+                className={`despensa-tab-font despensa-navitem${activo ? " is-active" : ""}`}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
                   gap: 12,
-                  padding: "12px 10px",
-                  borderRadius: 9,
-                  border: "none",
-                  background: activo ? "var(--sage-bg)" : "transparent",
+                  padding: "11px 10px",
+                  background: "transparent",
                   color: activo ? "var(--sage)" : "var(--ink)",
                   fontSize: 14,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  textAlign: "left",
+                  fontWeight: activo ? 700 : 500,
                 }}
               >
-                <Icon size={18} />
-                {item.label}
+                <Icon
+                  size={18}
+                  strokeWidth={activo ? 2.25 : 1.9}
+                  style={{ flexShrink: 0, fill: "none" }}
+                />
+                <span className="despensa-navlabel" style={{ fontWeight: activo ? 700 : 500 }}>
+                  {item.label}
+                </span>
               </button>
             );
           })}
