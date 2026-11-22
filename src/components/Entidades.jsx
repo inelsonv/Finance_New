@@ -4,7 +4,7 @@ import { addEntidad, deleteEntidad, updateEntidad, addTipoEntidad } from "../lib
 import { confirm } from "../lib/confirm";
 import Pagination from "./Pagination.jsx";
 import { WhatsAppIcon } from "./WhatsAppIcon.jsx";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 const PAGE_SIZE = 10;
 
@@ -22,6 +22,7 @@ const TYPES_BASE = [
 const NUEVO_TIPO = "__nuevo__";
 
 export default function Entidades({ entidades, tiposPersonalizados }) {
+  const isMobile = useIsMobile();
   const TYPES = useMemo(() => {
     const personalizados = (tiposPersonalizados || []).map((t) => t.nombre);
     return [...TYPES_BASE.filter((t) => t !== "Otro"), ...personalizados, "Otro"];
@@ -410,7 +411,7 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
             ? "Todavía no registraste ninguna entidad. Agrega la primera."
             : "No hay entidades que coincidan con la búsqueda."}
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={paginated}
           getRowId={(e) => e.docId}

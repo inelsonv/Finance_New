@@ -3,7 +3,7 @@ import { Plus, Trash2, X, Briefcase, Pencil, Check, Landmark, Gift } from "lucid
 import { addFuenteIngreso, deleteFuenteIngreso, updateFuenteIngresoEstado, updateFuenteIngreso, addIngresoPuntual, deleteIngresoPuntual, marcarIngresoPuntualRecibido } from "../lib/db";
 import { calcularDeduccionesLey } from "../lib/deduccionesLey";
 import { confirm } from "../lib/confirm";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 export const FUENTE_TIPOS = ["Salario", "Freelance", "Negocio propio", "Renta", "Otro"];
 const TIPOS_INGRESO_PUNTUAL = ["Bonificación", "Regalía Pascual", "Bono Vacacional", "Comisión", "Otro"];
@@ -52,6 +52,7 @@ function toEditForm(f) {
 }
 
 export default function FuentesIngreso({ fuentes, entidades, movimientos, ingresosPuntuales }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
     try {
@@ -658,7 +659,7 @@ export default function FuentesIngreso({ fuentes, entidades, movimientos, ingres
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ninguna fuente de ingreso.
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={fuentes}
           columns={[

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Trash2, X, Pencil, Check, Calendar, Sparkles, Bell, AlertTriangle, Clock } from "lucide-react";
 import { addMembresia, deleteMembresia, updateMembresiaEstado, updateMembresia } from "../lib/db";
 import { confirm } from "../lib/confirm";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 export const MEMBRESIA_TIPOS = ["Software / IA", "Streaming", "Gimnasio", "Club de compras", "Salud", "Otro"];
 const FRECUENCIAS = ["Mensual", "Trimestral", "Semestral", "Anual"];
@@ -149,6 +149,7 @@ function toEditForm(m) {
 }
 
 export default function Membresias({ membresias, entidades, movimientos }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
     try {
@@ -671,7 +672,7 @@ export default function Membresias({ membresias, entidades, movimientos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ninguna membresía o suscripción.
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={membresias}
           columns={[

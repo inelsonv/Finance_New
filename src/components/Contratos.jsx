@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Trash2, X, FileText, Pencil, Check, Landmark } from "lucide-react";
 import { addContrato, deleteContrato, updateContratoEstado, updateContrato } from "../lib/db";
 import { confirm } from "../lib/confirm";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 export const CONTRATO_TIPOS = [
   "Electricidad",
@@ -109,6 +109,7 @@ function toEditForm(c) {
 }
 
 export default function Contratos({ contratos, entidades, movimientos }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
     try {
@@ -500,7 +501,7 @@ export default function Contratos({ contratos, entidades, movimientos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no registraste ningún contrato.
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={contratos}
           columns={[

@@ -15,7 +15,7 @@ import {
   describirEscenarioDivision,
   contarMesesDivision,
 } from "../lib/prestamoDivision";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 const PLAZO_UNIDADES = ["meses", "años"];
 const TIPOS_PRESTAMO = ["Vehículo", "Hipotecario / Vivienda", "Personal", "Estudiantil", "Consolidación de deuda", "Negocio", "Otro"];
@@ -1123,6 +1123,7 @@ const emptyForm = (numero, cuentas = []) => {
 };
 
 export default function Prestamos({ prestamos, entidades, movimientos, activos, cuentas = [], focusPrestamoId, soloCuotasEndeudamiento = false, onClearFiltroEndeudamiento }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
     try {
@@ -2717,7 +2718,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
             ? "Todavía no registraste ningún préstamo."
             : "No tienes préstamos activos — revisa el histórico abajo."}
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={prestamosVisibles}
           columns={[
@@ -3143,7 +3144,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
               cursor: "pointer",
               width: "100%",
               justifyContent: "space-between",
-              marginBottom: showHistorico && vistaModo === "tabla" ? 10 : 0,
+              marginBottom: showHistorico && !isMobile && vistaModo === "tabla" ? 10 : 0,
             }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -3153,7 +3154,7 @@ export default function Prestamos({ prestamos, entidades, movimientos, activos, 
           </button>
 
           {showHistorico && (
-            vistaModo === "tabla" ? (
+            !isMobile && vistaModo === "tabla" ? (
               <CrudTable
                 rows={prestamosPagados}
                 columns={[

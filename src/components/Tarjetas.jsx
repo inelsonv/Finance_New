@@ -4,7 +4,7 @@ import { addTarjeta, deleteTarjeta, updateTarjetaEstado, updateTarjeta } from ".
 import { confirm } from "../lib/confirm";
 import Switch from "./Switch.jsx";
 import TarjetasApiladas from "./TarjetasApiladas.jsx";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 const ESTADOS = ["Activa", "Bloqueada", "Cancelada"];
 const TIPOS_TARJETA = ["Crédito", "Débito"];
@@ -208,6 +208,7 @@ function toEditForm(t) {
 }
 
 export default function Tarjetas({ tarjetas, entidades, movimientos, categoriasGasto, focusTarjetaId }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaApilada, setVistaApilada] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
@@ -950,7 +951,7 @@ export default function Tarjetas({ tarjetas, entidades, movimientos, categoriasG
             Arrastra la tarjeta de enfrente hacia abajo para pasar a la siguiente · Tócala para editarla
           </div>
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={tarjetas}
           columns={[

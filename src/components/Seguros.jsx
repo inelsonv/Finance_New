@@ -3,7 +3,7 @@ import { Plus, Trash2, X, Pencil, Check, Shield, Car, HeartPulse, Home, Umbrella
 import { addSeguro, deleteSeguro, updateSeguroEstado, updateSeguro } from "../lib/db";
 import { confirm } from "../lib/confirm";
 import SeguroSaludCard, { ARS_ESTILOS, ARS_PRESETS } from "./SeguroSaludCard.jsx";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 
 const TIPOS = ["Vehículo", "Salud", "Vida", "Hogar/Propiedad", "Otro"];
 const ESTADOS = ["Activo", "Vencido", "Cancelado"];
@@ -89,6 +89,7 @@ function toEditForm(s) {
 }
 
 export default function Seguros({ seguros, entidades, activos }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [vistaModo, setVistaModo] = useState(() => {
     try {
@@ -594,7 +595,7 @@ export default function Seguros({ seguros, entidades, activos }) {
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
           Todavía no tienes seguros registrados. Agrega tu seguro de salud (ARS y plástico digital), vehículo, vida, hogar o cualquier otro.
         </div>
-      ) : vistaModo === "tabla" ? (
+      ) : !isMobile && vistaModo === "tabla" ? (
         <CrudTable
           rows={seguros}
           columns={[

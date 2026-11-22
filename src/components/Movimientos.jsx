@@ -4,7 +4,7 @@ import { addMovimiento, deleteMovimiento, updateMovimientoFecha, updateMovimient
 import { lanzarCoheteHaciaPuntos } from "../lib/coheteVolando";
 import SwipeableRow from "./SwipeableRow.jsx";
 import Pagination from "./Pagination.jsx";
-import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
+import CrudTable, { CrudViewToggle, useIsMobile } from "./CrudTable.jsx";
 import { CUENTA_TIPOS } from "./Cuentas.jsx";
 import { GASTO_CATS_FIJO, GASTO_CATS_VARIABLE } from "../lib/categorias";
 
@@ -63,6 +63,7 @@ const emptyForm = () => ({
 });
 
 export default function Movimientos({ movimientos, entidades, prestamos, cuentas, tarjetas, membresias, fuentesIngreso, categoriasGasto, contratos, presupuesto, presupuestoYear, diasCobro }) {
+  const isMobile = useIsMobile();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState(null);
@@ -1523,7 +1524,7 @@ export default function Movimientos({ movimientos, entidades, prestamos, cuentas
           );
         }
 
-        if (vistaModo === "tabla") {
+        if (!isMobile && vistaModo === "tabla") {
           return (
             <CrudTable
               rows={paginated}

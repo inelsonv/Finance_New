@@ -1,5 +1,30 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { LayoutList, LayoutGrid, Pencil, Trash2 } from "lucide-react";
+
+/**
+ * Hook responsivo para detectar viewport móvil (<= 640px).
+ * Permite mantener la vista clásica de tarjetas/filas en móvil y tabla CRUD en escritorio.
+ */
+export function useIsMobile(maxWidth = 640) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= maxWidth : false
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
+  }, [maxWidth]);
+
+  return isMobile;
+}
 
 /**
  * Selector compacto para alternar entre vista Listado CRUD (tabla) y vista Tarjetas.
@@ -7,6 +32,7 @@ import { LayoutList, LayoutGrid, Pencil, Trash2 } from "lucide-react";
 export function CrudViewToggle({ mode, onChange, cardsLabel = "Tarjetas" }) {
   return (
     <div
+      className="despensa-desktop-only"
       style={{
         display: "inline-flex",
         alignItems: "center",
