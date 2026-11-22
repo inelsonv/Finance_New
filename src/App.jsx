@@ -280,6 +280,14 @@ export default function App() {
   const [planActual, setPlanActual] = useState(null);
   const [duoSyncVersion, setDuoSyncVersion] = useState(0);
   const [duoInfo, setDuoInfo] = useState({ esDuo: false, titularEmail: null });
+  const mainRef = useRef(null);
+
+  const scrollToTop = () => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: "auto" });
+    }
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
 
   useEffect(() => {
     let timer = null;
@@ -367,6 +375,7 @@ export default function App() {
 
   const seleccionarTab = (tabId) => {
     setPrestamosFiltroEndeudamiento(false);
+    scrollToTop();
     if (!esPropietario && ADMIN_ONLY_TABS.has(tabId)) {
       setTab("inicio");
       return;
@@ -973,7 +982,7 @@ export default function App() {
         setPrestamosFiltroEndeudamiento(true);
         setHighlightId(null);
         setTab("prestamos");
-        window.scrollTo({ top: 0, behavior: "auto" });
+        scrollToTop();
         return;
       }
       setPrestamosFiltroEndeudamiento(false);
@@ -1032,7 +1041,7 @@ export default function App() {
         saludControles={saludControles}
       />
       <PullToRefresh disabled={tab === "asistente"} />
-      <main className={`despensa-main${tab === "asistente" ? " despensa-main--assistant" : ""}`}>
+      <main ref={mainRef} className={`despensa-main${tab === "asistente" ? " despensa-main--assistant" : ""}`}>
         <div className="despensa-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "nowrap", gap: 8, minWidth: 0 }}>
           <div className={`despensa-header-left${searchOpen ? " despensa-header-left--search-open" : ""}`} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1, overflow: "hidden" }}>
             <button
@@ -1047,7 +1056,7 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   seleccionarTab("inicio");
-                  window.scrollTo({ top: 0, behavior: "auto" });
+                  scrollToTop();
                 }}
                 className="despensa-hamburger"
                 title="Volver al inicio"
@@ -1239,7 +1248,7 @@ export default function App() {
                 const esMovil = typeof window !== "undefined" && window.innerWidth <= 640;
                 if (esMovil || !asistenteFlotanteActivo) {
                   setTab("asistente");
-                  window.scrollTo({ top: 0, behavior: "auto" });
+                  scrollToTop();
                 } else {
                   setShowAsistenteFlotante(true);
                 }
@@ -1249,12 +1258,12 @@ export default function App() {
                 setPrestamosFiltroEndeudamiento(true);
                 setHighlightId(null);
                 setTab("prestamos");
-                window.scrollTo({ top: 0, behavior: "auto" });
+                scrollToTop();
                 return;
               }
               setPrestamosFiltroEndeudamiento(false);
               setTab(targetTab);
-              window.scrollTo({ top: 0, behavior: "auto" });
+              scrollToTop();
             }}
             isOwner={esPropietario}
           />
