@@ -4,6 +4,7 @@ import { addEntidad, deleteEntidad, updateEntidad, addTipoEntidad } from "../lib
 import { confirm } from "../lib/confirm";
 import Pagination from "./Pagination.jsx";
 import { WhatsAppIcon } from "./WhatsAppIcon.jsx";
+import CrudTable, { CrudViewToggle } from "./CrudTable.jsx";
 
 const PAGE_SIZE = 10;
 
@@ -36,8 +37,22 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
   const [editForm, setEditForm] = useState(null);
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [vistaModo, setVistaModo] = useState(() => {
+    try {
+      const saved = localStorage.getItem("smart-finance-entidades-vista");
+      if (saved === "tabla" || saved === "tarjetas") return saved;
+    } catch {}
+    return "tabla";
+  });
   const [nuevoTipoNombre, setNuevoTipoNombre] = useState("");
   const [nuevoTipoTarget, setNuevoTipoTarget] = useState(null); // "form" | "edit" | null
+
+  const cambiarVistaModo = (modo) => {
+    setVistaModo(modo);
+    try {
+      localStorage.setItem("smart-finance-entidades-vista", modo);
+    } catch {}
+  };
 
   const handleTypeSelect = (value, target) => {
     if (value === NUEVO_TIPO) {
@@ -132,9 +147,109 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
     }
   };
 
+  const renderEditForm = () => (
+    <div>
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          autoFocus
+          value={editForm.name}
+          onChange={(ev) => setEditForm({ ...editForm, name: ev.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <select
+          value={editForm.type}
+          onChange={(ev) => handleTypeSelect(ev.target.value, "edit")}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+        >
+          {TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+          <option value={NUEVO_TIPO}>+ Agregar nuevo tipo…</option>
+        </select>
+      </div>
+
+      {nuevoTipoTarget === "edit" && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+          <input
+            autoFocus
+            placeholder="Nombre del nuevo tipo, ej. Puesto de Bolsa"
+            value={nuevoTipoNombre}
+            onChange={(e) => setNuevoTipoNombre(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmarNuevoTipo()}
+            style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+          />
+          <button
+            onClick={confirmarNuevoTipo}
+            style={{ padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
+          >
+            Usar
+          </button>
+          <button
+            onClick={() => setNuevoTipoTarget(null)}
+            style={{ padding: "8px 10px", fontSize: 13, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input
+          placeholder="Dirección (opcional)"
+          value={editForm.address}
+          onChange={(ev) => setEditForm({ ...editForm, address: ev.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+        <input
+          placeholder="Teléfono (opcional)"
+          value={editForm.phone}
+          onChange={(ev) => setEditForm({ ...editForm, phone: ev.target.value })}
+          style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
+        />
+      </div>
+      <input
+        placeholder="Notas (opcional)"
+        value={editForm.notes}
+        onChange={(ev) => setEditForm({ ...editForm, notes: ev.target.value })}
+        style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
+      />
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 10, cursor: "pointer", color: "var(--ink)" }}>
+        <input
+          type="checkbox"
+          checked={editForm.notificarWhatsapp}
+          onChange={(ev) => setEditForm({ ...editForm, notificarWhatsapp: ev.target.checked })}
+        />
+        <WhatsAppIcon size={14} color="#25D366" />
+        <span>Notificar pagos de préstamos vía WhatsApp</span>
+      </label>
+      {editForm.notificarWhatsapp && !editForm.phone && (
+        <div style={{ fontSize: 11, color: "var(--amber)", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
+          ⚠️ Recuerda ingresar el teléfono con código de área para que WhatsApp pueda abrirse al pagar en el Checklist.
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={saveEdit}
+          disabled={editSaving}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
+        >
+          <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button
+          onClick={cancelEdit}
+          style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
+    </div>
+  );
+
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: "1 1 200px" }}>
           <Search size={14} style={{ position: "absolute", left: 10, top: 11, color: "var(--ink-soft)" }} />
           <input
@@ -170,6 +285,7 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
           {showForm ? <X size={14} /> : <Plus size={14} />}
           {showForm ? "Cancelar" : "Agregar entidad"}
         </button>
+        <CrudViewToggle mode={vistaModo} onChange={cambiarVistaModo} />
       </div>
 
       {showForm && (
@@ -294,6 +410,100 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
             ? "Todavía no registraste ninguna entidad. Agrega la primera."
             : "No hay entidades que coincidan con la búsqueda."}
         </div>
+      ) : vistaModo === "tabla" ? (
+        <CrudTable
+          rows={paginated}
+          getRowId={(e) => e.docId}
+          columns={[
+            {
+              key: "no",
+              label: "No.",
+              mono: true,
+              render: (e, idx) => (
+                <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+                  {e.num != null ? `#${e.num}` : (page - 1) * PAGE_SIZE + idx + 1}
+                </span>
+              ),
+            },
+            {
+              key: "name",
+              label: "Entidad",
+              wrap: true,
+              render: (e) => (
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>{e.name}</div>
+                  {e.notes && <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{e.notes}</div>}
+                </div>
+              ),
+            },
+            {
+              key: "type",
+              label: "Tipo",
+              render: (e) => (
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-soft)" }}>
+                  {e.type || "—"}
+                </span>
+              ),
+            },
+            {
+              key: "phone",
+              label: "Teléfono",
+              mono: true,
+              render: (e) => e.phone || "—",
+            },
+            {
+              key: "address",
+              label: "Dirección",
+              wrap: true,
+              render: (e) => (
+                <span style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
+                  {e.address || "—"}
+                </span>
+              ),
+            },
+            {
+              key: "whatsapp",
+              label: "WhatsApp",
+              align: "center",
+              render: (e) => (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const nuevoValor = !(e.notificarWhatsapp !== false);
+                    await updateEntidad(e.docId, { notificarWhatsapp: nuevoValor });
+                  }}
+                  title={
+                    e.notificarWhatsapp !== false
+                      ? "WhatsApp activo: toca para pausar notificaciones de pago"
+                      : "WhatsApp inactivo: toca para activar notificaciones de pago"
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: e.notificarWhatsapp !== false ? "rgba(37, 211, 102, 0.12)" : "var(--line-soft)",
+                    color: e.notificarWhatsapp !== false ? "#10b981" : "var(--ink-soft)",
+                    border: `1px solid ${e.notificarWhatsapp !== false ? "rgba(37, 211, 102, 0.3)" : "var(--line)"}`,
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <WhatsAppIcon size={12} color={e.notificarWhatsapp !== false ? "#25D366" : "var(--ink-soft)"} />
+                  <span>{e.notificarWhatsapp !== false ? "Activo" : "Pausado"}</span>
+                </button>
+              ),
+            },
+          ]}
+          onEdit={(e) => startEdit(e)}
+          onDelete={async (e) => {
+            if (await confirm("¿Eliminar esta entidad?")) deleteEntidad(e.docId);
+          }}
+          isRowExpanded={(e) => editingId === e.docId}
+          renderExpandedRow={() => renderEditForm()}
+        />
       ) : (
         <div style={{ border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", background: "var(--card)", minHeight: PAGE_SIZE * 53 }}>
           {paginated.map((e, i) => (
@@ -307,103 +517,7 @@ export default function Entidades({ entidades, tiposPersonalizados }) {
               }}
             >
               {editingId === e.docId ? (
-                <div>
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      autoFocus
-                      value={editForm.name}
-                      onChange={(ev) => setEditForm({ ...editForm, name: ev.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <select
-                      value={editForm.type}
-                      onChange={(ev) => handleTypeSelect(ev.target.value, "edit")}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
-                    >
-                      {TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                      <option value={NUEVO_TIPO}>+ Agregar nuevo tipo…</option>
-                    </select>
-                  </div>
-
-                  {nuevoTipoTarget === "edit" && (
-                    <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                      <input
-                        autoFocus
-                        placeholder="Nombre del nuevo tipo, ej. Puesto de Bolsa"
-                        value={nuevoTipoNombre}
-                        onChange={(e) => setNuevoTipoNombre(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && confirmarNuevoTipo()}
-                        style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                      />
-                      <button
-                        onClick={confirmarNuevoTipo}
-                        style={{ padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
-                      >
-                        Usar
-                      </button>
-                      <button
-                        onClick={() => setNuevoTipoTarget(null)}
-                        style={{ padding: "8px 10px", fontSize: 13, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                  <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <input
-                      placeholder="Dirección (opcional)"
-                      value={editForm.address}
-                      onChange={(ev) => setEditForm({ ...editForm, address: ev.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                    <input
-                      placeholder="Teléfono (opcional)"
-                      value={editForm.phone}
-                      onChange={(ev) => setEditForm({ ...editForm, phone: ev.target.value })}
-                      style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
-                    />
-                  </div>
-                  <input
-                    placeholder="Notas (opcional)"
-                    value={editForm.notes}
-                    onChange={(ev) => setEditForm({ ...editForm, notes: ev.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, marginBottom: 10 }}
-                  />
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 10, cursor: "pointer", color: "var(--ink)" }}>
-                    <input
-                      type="checkbox"
-                      checked={editForm.notificarWhatsapp}
-                      onChange={(ev) => setEditForm({ ...editForm, notificarWhatsapp: ev.target.checked })}
-                    />
-                    <WhatsAppIcon size={14} color="#25D366" />
-                    <span>Notificar pagos de préstamos vía WhatsApp</span>
-                  </label>
-                  {editForm.notificarWhatsapp && !editForm.phone && (
-                    <div style={{ fontSize: 11, color: "var(--amber)", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
-                      ⚠️ Recuerda ingresar el teléfono con código de área para que WhatsApp pueda abrirse al pagar en el Checklist.
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: editSaving ? "not-allowed" : "pointer" }}
-                    >
-                      <Check size={14} /> {editSaving ? "Guardando…" : "Guardar cambios"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      style={{ padding: "7px 14px", fontSize: 13, fontWeight: 500, background: "var(--card)", color: "var(--ink-soft)", border: "1px solid var(--line)", borderRadius: 8, cursor: "pointer" }}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                  {editError && <div style={{ marginTop: 10, fontSize: 12, color: "var(--stamp)" }}>{editError}</div>}
-                </div>
+                renderEditForm()
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span
