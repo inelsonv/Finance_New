@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { CreditCard, Sparkles } from "lucide-react";
+import { CreditCard, Sparkles, ShieldPlus } from "lucide-react";
 import { CardVisual } from "./Tarjetas.jsx";
 import { MembershipCard } from "./Membresias.jsx";
+import SeguroSaludCard from "./SeguroSaludCard.jsx";
 import PilaApilada from "./PilaApilada.jsx";
 
-export default function Wallet({ tarjetas, membresias, onNavigate }) {
+export default function Wallet({ tarjetas, membresias, seguros, onNavigate }) {
   const [filtro, setFiltro] = useState("todas");
 
   const items = useMemo(() => {
@@ -14,10 +15,14 @@ export default function Wallet({ tarjetas, membresias, onNavigate }) {
     const m = (membresias || [])
       .filter((x) => x.estado === "Activa")
       .map((x) => ({ ...x, _tipo: "membresia" }));
+    const s = (seguros || [])
+      .filter((x) => x.estado === "Activo" && x.tipo === "Salud")
+      .map((x) => ({ ...x, _tipo: "seguro" }));
     if (filtro === "tarjetas") return t;
     if (filtro === "membresias") return m;
-    return [...t, ...m];
-  }, [tarjetas, membresias, filtro]);
+    if (filtro === "seguros") return s;
+    return [...t, ...s, ...m];
+  }, [tarjetas, membresias, seguros, filtro]);
 
   const [frente, setFrente] = useState(null);
 
@@ -27,6 +32,7 @@ export default function Wallet({ tarjetas, membresias, onNavigate }) {
         {[
           { id: "todas", label: "Todas" },
           { id: "tarjetas", label: "Tarjetas" },
+          { id: "seguros", label: "Seguros / ARS" },
           { id: "membresias", label: "Membresías" },
         ].map((f) => (
           <button
@@ -51,18 +57,34 @@ export default function Wallet({ tarjetas, membresias, onNavigate }) {
       <div style={{ padding: "10px 0 20px" }}>
         <PilaApilada
           items={items}
-          renderItem={(item) => (item._tipo === "tarjeta" ? <CardVisual tarjeta={item} /> : <MembershipCard membresia={item} />)}
+          renderItem={(item) => {
+            if (item._tipo === "tarjeta") return <CardVisual tarjeta={item} />;
+            if (item._tipo === "seguro") return <SeguroSaludCard seguro={item} compact />;
+            return <MembershipCard membresia={item} />;
+          }}
           onChangeFrente={setFrente}
-          onTapFrente={(item) => onNavigate && onNavigate(item._tipo === "tarjeta" ? "tarjetas" : "membresias")}
-          mensajeVacio="No tienes tarjetas ni membresías activas todavía."
+          onTapFrente={(item) => {
+            if (!onNavigate) return;
+            if (item._tipo === "tarjeta") onNavigate("tarjetas");
+            else if (item._tipo === "seguro") onNavigate("seguros");
+            else onNavigate("membresias");
+          }}
+          mensajeVacio="No tienes tarjetas, carnets ARS ni membresías activas todavía."
         />
       </div>
 
       {frente && (
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 20, background: "var(--card)", border: "1px solid var(--line)", fontSize: 12.5, color: "var(--ink-soft)" }}>
-            {frente._tipo === "tarjeta" ? <CreditCard size={13} /> : <Sparkles size={13} />}
-            {frente.nombre}
+            {frente._tipo === "tarjeta" ? (
+              <CreditCard size={13} />
+            ) : frente._tipo === "seguro" ? (
+              <ShieldPlus size={13} />
+            ) : (
+              <Sparkles size={13} />
+            )}
+            {frente._tipo === "seguro" ? (frente.arsNombre || frente.nombre) : frente.nombre}
+            {frente._tipo === "seguro" && frente.planNombre ? ` · ${frente.planNombre}` : ""}
           </div>
         </div>
       )}

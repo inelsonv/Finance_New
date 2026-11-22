@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Plus, Trash2, X, Pencil, Check, Shield, Car, HeartPulse, Home, Umbrella, Calendar, Landmark } from "lucide-react";
+import { Plus, Trash2, X, Pencil, Check, Shield, Car, HeartPulse, Home, Umbrella, Calendar, Landmark, ShieldPlus } from "lucide-react";
 import { addSeguro, deleteSeguro, updateSeguroEstado, updateSeguro } from "../lib/db";
 import { confirm } from "../lib/confirm";
+import SeguroSaludCard, { ARS_ESTILOS, ARS_PRESETS } from "./SeguroSaludCard.jsx";
 
 const TIPOS = ["Vehículo", "Salud", "Vida", "Hogar/Propiedad", "Otro"];
 const ESTADOS = ["Activo", "Vencido", "Cancelado"];
@@ -38,9 +39,9 @@ function diasHasta(fecha) {
   return Math.round((target - hoy) / 86400000);
 }
 
-const emptyForm = () => ({
+const emptyForm = (tipoInicial = TIPOS[0]) => ({
   nombre: "",
-  tipo: TIPOS[0],
+  tipo: tipoInicial,
   entidadId: "",
   activoId: "",
   numeroPoliza: "",
@@ -51,6 +52,14 @@ const emptyForm = () => ({
   diasAviso: "15",
   estado: "Activo",
   notas: "",
+  arsNombre: "",
+  planNombre: "",
+  numeroAfiliado: "",
+  nss: "",
+  titularNombre: "",
+  dependientes: "",
+  telefonoAutorizaciones: "",
+  colorPlastico: "primera-humano",
 });
 
 function toEditForm(s) {
@@ -67,6 +76,14 @@ function toEditForm(s) {
     diasAviso: s.diasAviso != null ? String(s.diasAviso) : "15",
     estado: s.estado || "Activo",
     notas: s.notas || "",
+    arsNombre: s.arsNombre || "",
+    planNombre: s.planNombre || "",
+    numeroAfiliado: s.numeroAfiliado || "",
+    nss: s.nss || "",
+    titularNombre: s.titularNombre || "",
+    dependientes: s.dependientes || "",
+    telefonoAutorizaciones: s.telefonoAutorizaciones || "",
+    colorPlastico: s.colorPlastico || "primera-humano",
   };
 }
 
@@ -95,9 +112,13 @@ export default function Seguros({ seguros, entidades, activos }) {
   };
 
   const handleAdd = async () => {
-    const nombre = form.nombre.trim();
+    const nombre = form.nombre.trim() || (form.tipo === "Salud" && form.arsNombre.trim() ? `Seguro Médico - ${form.arsNombre.trim()}` : "");
     if (!nombre) {
-      setFormError("Ingresa un nombre, ej. Seguro de vehículo - CR-V");
+      setFormError(
+        form.tipo === "Salud"
+          ? "Ingresa un nombre o selecciona tu ARS (ej. Primera ARS de Humano)"
+          : "Ingresa un nombre, ej. Seguro de vehículo - CR-V"
+      );
       return;
     }
     setSaving(true);
@@ -120,6 +141,14 @@ export default function Seguros({ seguros, entidades, activos }) {
         diasAviso: parseInt(form.diasAviso, 10) || 15,
         estado: form.estado,
         notas: form.notas.trim(),
+        arsNombre: form.tipo === "Salud" ? form.arsNombre.trim() : "",
+        planNombre: form.tipo === "Salud" ? form.planNombre.trim() : "",
+        numeroAfiliado: form.tipo === "Salud" ? form.numeroAfiliado.trim() : "",
+        nss: form.tipo === "Salud" ? form.nss.trim() : "",
+        titularNombre: form.tipo === "Salud" ? form.titularNombre.trim() : "",
+        dependientes: form.tipo === "Salud" ? form.dependientes.trim() : "",
+        telefonoAutorizaciones: form.tipo === "Salud" ? form.telefonoAutorizaciones.trim() : "",
+        colorPlastico: form.tipo === "Salud" ? form.colorPlastico || "primera-humano" : "primera-humano",
       });
       setForm(emptyForm());
       setShowForm(false);
@@ -131,7 +160,7 @@ export default function Seguros({ seguros, entidades, activos }) {
   };
 
   const saveEdit = async () => {
-    const nombre = editForm.nombre.trim();
+    const nombre = editForm.nombre.trim() || (editForm.tipo === "Salud" && editForm.arsNombre.trim() ? `Seguro Médico - ${editForm.arsNombre.trim()}` : "");
     if (!nombre) {
       setEditError("Ingresa un nombre para el seguro");
       return;
@@ -156,6 +185,14 @@ export default function Seguros({ seguros, entidades, activos }) {
         diasAviso: parseInt(editForm.diasAviso, 10) || 15,
         estado: editForm.estado,
         notas: editForm.notas.trim(),
+        arsNombre: editForm.tipo === "Salud" ? editForm.arsNombre.trim() : "",
+        planNombre: editForm.tipo === "Salud" ? editForm.planNombre.trim() : "",
+        numeroAfiliado: editForm.tipo === "Salud" ? editForm.numeroAfiliado.trim() : "",
+        nss: editForm.tipo === "Salud" ? editForm.nss.trim() : "",
+        titularNombre: editForm.tipo === "Salud" ? editForm.titularNombre.trim() : "",
+        dependientes: editForm.tipo === "Salud" ? editForm.dependientes.trim() : "",
+        telefonoAutorizaciones: editForm.tipo === "Salud" ? editForm.telefonoAutorizaciones.trim() : "",
+        colorPlastico: editForm.tipo === "Salud" ? editForm.colorPlastico || "primera-humano" : "primera-humano",
       });
       cancelEdit();
     } catch (err) {
@@ -170,7 +207,7 @@ export default function Seguros({ seguros, entidades, activos }) {
       <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 8 }}>
         <input
           autoFocus
-          placeholder="Nombre, ej. Seguro de vehículo - CR-V"
+          placeholder={f.tipo === "Salud" ? "Nombre, ej. Primera ARS de Humano - Plan Complementario" : "Nombre, ej. Seguro de vehículo - CR-V"}
           value={f.nombre}
           onChange={(e) => setF({ ...f, nombre: e.target.value })}
           style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13 }}
@@ -185,6 +222,186 @@ export default function Seguros({ seguros, entidades, activos }) {
           ))}
         </select>
       </div>
+
+      {f.tipo === "Salud" && (() => {
+        const presetActivo = ARS_PRESETS.find((p) => p.arsNombre.toLowerCase() === (f.arsNombre || "").trim().toLowerCase());
+        return (
+          <div
+            style={{
+              border: "1px solid var(--line)",
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 10,
+              background: "var(--paper)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>
+                <ShieldPlus size={14} style={{ color: "var(--sage)" }} />
+                Simulador de Plástico / Carnet ARS
+              </span>
+              <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>
+                También aparecerá en tu Wallet y en Salud
+              </span>
+            </div>
+
+            {/* Presets rápidos de ARS */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              {ARS_PRESETS.map((preset) => {
+                const selected = (f.arsNombre || "").trim().toLowerCase() === preset.arsNombre.toLowerCase();
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() =>
+                      setF({
+                        ...f,
+                        arsNombre: preset.arsNombre,
+                        colorPlastico: preset.colorPlastico,
+                        telefonoAutorizaciones: f.telefonoAutorizaciones || preset.telefonoAutorizaciones,
+                        nombre: f.nombre.trim() ? f.nombre : `Seguro Médico - ${preset.arsNombre}`,
+                      })
+                    }
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 11.5,
+                      fontWeight: selected ? 600 : 500,
+                      borderRadius: 6,
+                      border: `1px solid ${selected ? "var(--sage)" : "var(--line)"}`,
+                      background: selected ? "var(--sage-bg)" : "var(--card)",
+                      color: selected ? "var(--sage)" : "var(--ink-soft)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {preset.arsNombre}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, alignItems: "start" }}>
+              <div>
+                <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <input
+                    placeholder="ARS (ej. Primera ARS de Humano)"
+                    value={f.arsNombre}
+                    onChange={(e) => setF({ ...f, arsNombre: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                  <input
+                    placeholder="Plan (ej. Complementario, Máximo, PDSS)"
+                    value={f.planNombre}
+                    onChange={(e) => setF({ ...f, planNombre: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                </div>
+
+                {presetActivo?.planesComunes?.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                    {presetActivo.planesComunes.map((plan) => (
+                      <button
+                        key={plan}
+                        type="button"
+                        onClick={() => setF({ ...f, planNombre: plan })}
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: 10.5,
+                          borderRadius: 5,
+                          border: `1px solid ${f.planNombre === plan ? "var(--sage)" : "var(--line)"}`,
+                          background: f.planNombre === plan ? "var(--sage-bg)" : "var(--card)",
+                          color: f.planNombre === plan ? "var(--sage)" : "var(--ink-soft)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {plan}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <input
+                    className="despensa-mono"
+                    placeholder="No. de Carnet / Afiliado (Plástico)"
+                    value={f.numeroAfiliado}
+                    onChange={(e) => setF({ ...f, numeroAfiliado: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                  <input
+                    className="despensa-mono"
+                    placeholder="NSS (Seguridad Social)"
+                    value={f.nss}
+                    onChange={(e) => setF({ ...f, nss: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                </div>
+
+                <div className="despensa-formgrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                  <input
+                    placeholder="Nombre del titular en el plástico"
+                    value={f.titularNombre}
+                    onChange={(e) => setF({ ...f, titularNombre: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                  <input
+                    placeholder="Tel. autorizaciones / emergencias"
+                    value={f.telefonoAutorizaciones}
+                    onChange={(e) => setF({ ...f, telefonoAutorizaciones: e.target.value })}
+                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)" }}
+                  />
+                </div>
+
+                <input
+                  placeholder="Dependientes / Beneficiarios (opcional, ej. Esposa, Hijo)"
+                  value={f.dependientes}
+                  onChange={(e) => setF({ ...f, dependientes: e.target.value })}
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 8, fontSize: 13, background: "var(--card)", marginBottom: 10 }}
+                />
+
+                <div>
+                  <div style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: 6 }}>Diseño / Color del plástico</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {Object.entries(ARS_ESTILOS).map(([key, est]) => {
+                      const active = (f.colorPlastico || "primera-humano") === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setF({ ...f, colorPlastico: key })}
+                          title={est.label}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: `1px solid ${active ? "var(--sage)" : "var(--line)"}`,
+                            background: active ? "var(--sage-bg)" : "var(--card)",
+                            color: active ? "var(--ink)" : "var(--ink-soft)",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span style={{ width: 12, height: 12, borderRadius: 3, background: est.bg, border: "1px solid rgba(255,255,255,0.25)" }} />
+                          {est.label.split(" (")[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vista previa en vivo del plástico ARS */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: 6, alignSelf: "flex-start" }}>
+                  Vista previa del plástico (toca para voltear):
+                </div>
+                <SeguroSaludCard seguro={f} interactive />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {f.tipo === "Vehículo" && (
         <div style={{ marginBottom: 8 }}>
@@ -329,7 +546,17 @@ export default function Seguros({ seguros, entidades, activos }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => {
+            setForm(emptyForm("Salud"));
+            setShowForm(true);
+          }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--sage)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
+        >
+          <ShieldPlus size={14} /> Agregar seguro de salud (ARS)
+        </button>
         <button
           onClick={() => {
             if (!showForm) setForm(emptyForm());
@@ -338,7 +565,7 @@ export default function Seguros({ seguros, entidades, activos }) {
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 500, background: "var(--ink)", color: "var(--paper)", border: "none", borderRadius: 8, cursor: "pointer" }}
         >
           {showForm ? <X size={14} /> : <Plus size={14} />}
-          {showForm ? "Cancelar" : "Agregar seguro"}
+          {showForm ? "Cancelar" : "Agregar otro seguro"}
         </button>
       </div>
 
@@ -346,7 +573,7 @@ export default function Seguros({ seguros, entidades, activos }) {
 
       {seguros.length === 0 ? (
         <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--ink-soft)", fontSize: 13 }}>
-          Todavía no tienes seguros registrados. Agrega el de tu vehículo, salud, vida, hogar, o cualquier otro.
+          Todavía no tienes seguros registrados. Agrega tu seguro de salud (ARS y plástico digital), vehículo, vida, hogar o cualquier otro.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -365,16 +592,18 @@ export default function Seguros({ seguros, entidades, activos }) {
               else etiqueta = { text: `Vence en ${dias}d`, color: "var(--ink-soft)", bg: "var(--line-soft)" };
             }
 
+            const esSalud = s.tipo === "Salud";
+
             return (
-              <div key={s.id} data-record-id={s.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+              <div key={s.id} data-record-id={s.id} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
                     <div style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--sage-bg)", color: "var(--sage)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Icon size={14} />
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 14, fontWeight: 500 }}>{s.nombre}</span>
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{s.nombre}</span>
                         <EstadoBadge estado={s.estado} onChange={(estado) => updateSeguroEstado(s.id, estado)} />
                         {etiqueta && (
                           <span className="despensa-mono" style={{ fontSize: 9.5, fontWeight: 600, padding: "1px 7px", borderRadius: 12, background: etiqueta.bg, color: etiqueta.color }}>
@@ -384,6 +613,8 @@ export default function Seguros({ seguros, entidades, activos }) {
                       </div>
                       <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <span>{s.tipo}</span>
+                        {s.arsNombre && <span>· {s.arsNombre}</span>}
+                        {s.planNombre && <span>· {s.planNombre}</span>}
                         {s.entidadName && (
                           <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
                             <Landmark size={11} /> {s.entidadName}
@@ -413,24 +644,51 @@ export default function Seguros({ seguros, entidades, activos }) {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
-                  <Field label="No. de póliza" value={s.numeroPoliza || "—"} />
-                  <Field label="Prima" value={s.primaMonto != null ? `${formatMoney(s.primaMonto)} / ${s.primaFrecuencia}` : "—"} />
-                  <Field
-                    label="Vigencia"
-                    value={
-                      s.fechaInicio || s.fechaVencimiento ? (
-                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <Calendar size={11} /> {formatDateDisplay(s.fechaInicio) || "—"} - {formatDateDisplay(s.fechaVencimiento) || "—"}
-                        </span>
-                      ) : (
-                        "—"
-                      )
-                    }
-                  />
-                </div>
+                {esSalud ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, alignItems: "center" }}>
+                    <SeguroSaludCard seguro={s} interactive />
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+                      <Field label="ARS" value={s.arsNombre || s.entidadName || "—"} />
+                      <Field label="Plan" value={s.planNombre || "—"} />
+                      <Field label="No. Afiliado / Carnet" value={s.numeroAfiliado || "—"} />
+                      <Field label="NSS" value={s.nss || "—"} />
+                      <Field label="No. de póliza" value={s.numeroPoliza || "—"} />
+                      <Field label="Prima" value={s.primaMonto != null ? `${formatMoney(s.primaMonto)} / ${s.primaFrecuencia}` : "—"} />
+                      <Field
+                        label="Vigencia"
+                        value={
+                          s.fechaInicio || s.fechaVencimiento ? (
+                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <Calendar size={11} /> {formatDateDisplay(s.fechaInicio) || "—"} - {formatDateDisplay(s.fechaVencimiento) || "—"}
+                            </span>
+                          ) : (
+                            "—"
+                          )
+                        }
+                      />
+                      {s.dependientes && <Field label="Dependientes" value={s.dependientes} />}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
+                    <Field label="No. de póliza" value={s.numeroPoliza || "—"} />
+                    <Field label="Prima" value={s.primaMonto != null ? `${formatMoney(s.primaMonto)} / ${s.primaFrecuencia}` : "—"} />
+                    <Field
+                      label="Vigencia"
+                      value={
+                        s.fechaInicio || s.fechaVencimiento ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <Calendar size={11} /> {formatDateDisplay(s.fechaInicio) || "—"} - {formatDateDisplay(s.fechaVencimiento) || "—"}
+                          </span>
+                        ) : (
+                          "—"
+                        )
+                      }
+                    />
+                  </div>
+                )}
 
-                {s.notas && <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 8, borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>{s.notas}</div>}
+                {s.notas && <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 10, borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>{s.notas}</div>}
               </div>
             );
           })}

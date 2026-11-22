@@ -18,12 +18,15 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  ShieldPlus,
   Sparkles,
   Stethoscope,
   Trash2,
   UserPlus,
+  Wallet,
   X,
 } from "lucide-react";
+import SeguroSaludCard from "./SeguroSaludCard.jsx";
 import {
   addMovimiento,
   addSaludControl,
@@ -1364,6 +1367,79 @@ export default function Salud({
               )}
             </section>
           </div>
+
+          {/* Carnet / Seguro Médico (ARS) */}
+          <section style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: 12, padding: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+              <div>
+                <h3 className="despensa-tab-font" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--ink)", display: "flex", alignItems: "center", gap: 7 }}>
+                  <ShieldPlus size={16} style={{ color: "var(--sage)" }} />
+                  Carnet y Seguro Médico (ARS)
+                </h3>
+                <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>
+                  Ten a la mano tu plástico simulado (Primera ARS de Humano, SeNaSa, Universal, etc.) para tus citas y autorizaciones.
+                </div>
+              </div>
+              {onNavigate && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {segurosSalud.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate("wallet")}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "7px 11px",
+                        borderRadius: 8,
+                        border: "1px solid var(--line)",
+                        background: "var(--paper)",
+                        color: "var(--ink)",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Wallet size={13} /> Ver en Wallet
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("seguros")}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "7px 12px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "var(--sage)",
+                      color: "#fff",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Plus size={13} /> {segurosSalud.length > 0 ? "Gestionar seguro ARS" : "Agregar seguro ARS"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {segurosSalud.length === 0 ? (
+              <div style={{ padding: "14px 16px", borderRadius: 10, background: "var(--paper)", border: "1px dashed var(--line)", fontSize: 12.5, color: "var(--ink-soft)" }}>
+                Aún no tienes un seguro de salud activo. Regístralo en <strong>Activos → Seguros</strong> con tu ARS, plan, número de afiliado y NSS para generar tu plástico digital aquí y en tu <strong>Wallet</strong>.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
+                {segurosSalud.map((s) => (
+                  <div key={s.id}>
+                    <SeguroSaludCard seguro={s} interactive />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
 

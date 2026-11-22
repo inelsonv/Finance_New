@@ -3628,6 +3628,14 @@ export async function addSeguro({
   diasAviso,
   estado,
   notas,
+  arsNombre,
+  planNombre,
+  numeroAfiliado,
+  nss,
+  titularNombre,
+  dependientes,
+  telefonoAutorizaciones,
+  colorPlastico,
 }) {
   await addDoc(collection(db, "seguros"), {
     nombre,
@@ -3644,6 +3652,14 @@ export async function addSeguro({
     diasAviso: diasAviso ?? 15,
     estado: estado || "Activo",
     notas: notas || "",
+    arsNombre: arsNombre || "",
+    planNombre: planNombre || "",
+    numeroAfiliado: numeroAfiliado || "",
+    nss: nss || "",
+    titularNombre: titularNombre || "",
+    dependientes: dependientes || "",
+    telefonoAutorizaciones: telefonoAutorizaciones || "",
+    colorPlastico: colorPlastico || "primera-humano",
     createdAt: serverTimestamp(),
   });
 }

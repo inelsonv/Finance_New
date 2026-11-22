@@ -1342,7 +1342,7 @@ export default function App() {
           />
         )}
         {tab === "habitos" && <HabitTracker habitos={habitos} habitosRegistro={habitosRegistro} datosCorporales={datosCorporales} products={products} historialCompras={historialCompras} onNavigate={seleccionarTab} />}
-        {tab === "wallet" && <Wallet tarjetas={tarjetas} membresias={membresias} onNavigate={setTab} />}
+        {tab === "wallet" && <Wallet tarjetas={tarjetas} membresias={membresias} seguros={seguros} onNavigate={setTab} />}
 
         {esPropietario && tab === "compras" && (
           <Compras
