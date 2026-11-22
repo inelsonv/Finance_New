@@ -40,16 +40,27 @@ export const isOwnerUser = (user) => {
 };
 export const storage = getStorage(app);
 
-// App de Workspace provisionada para OAuth Client ID y permisos de Gmail API
+export const WORKSPACE_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/contacts",
+];
+
+// App de Workspace provisionada para OAuth Client ID y permisos de Google Workspace (Gmail y Contacts)
 export const workspaceApp =
   getApps().find((a) => a.name === "workspace-app") ||
   initializeApp(firebaseAppletConfig, "workspace-app");
 export const workspaceAuth = getAuth(workspaceApp);
 export const workspaceProvider = new GoogleAuthProvider();
-workspaceProvider.addScope("https://www.googleapis.com/auth/gmail.send");
+WORKSPACE_SCOPES.forEach((scope) => workspaceProvider.addScope(scope));
 workspaceProvider.setCustomParameters({
   prompt: "consent",
   access_type: "offline",
+});
+
+export const workspaceContactsProvider = new GoogleAuthProvider();
+workspaceContactsProvider.addScope("https://www.googleapis.com/auth/contacts");
+workspaceContactsProvider.setCustomParameters({
+  prompt: "consent",
 });
 
 // Caché para token de autenticación de login general
@@ -82,6 +93,21 @@ export const clearCachedGmailAccessToken = () => {
   cachedGmailAccessToken = null;
 };
 
+// Caché en memoria exclusivo para el token de acceso de Google Contacts (https://www.googleapis.com/auth/contacts)
+let cachedContactsAccessToken = null;
+
+export const setCachedContactsAccessToken = (token) => {
+  cachedContactsAccessToken = token;
+};
+
+export const getCachedContactsAccessToken = () => {
+  return cachedContactsAccessToken;
+};
+
+export const clearCachedContactsAccessToken = () => {
+  cachedContactsAccessToken = null;
+};
+
 // Obtiene o solicita un token OAuth específico para enviar correos con Gmail
 export const getOrRequestGmailAccessToken = async (forcePrompt = false) => {
   if (cachedGmailAccessToken && !forcePrompt) {
@@ -96,7 +122,7 @@ export const getOrRequestGmailAccessToken = async (forcePrompt = false) => {
           const client = window.google.accounts.oauth2.initTokenClient({
             client_id: firebaseAppletConfig.oAuthClientId,
             scope: "https://www.googleapis.com/auth/gmail.send",
-            hint: ALLOWED_EMAIL,
+            hint: auth.currentUser?.email || ALLOWED_EMAIL,
             callback: (resp) => {
               if (resp && resp.access_token) {
                 resolve(resp.access_token);
@@ -151,3 +177,73 @@ export const getOrRequestGmailAccessToken = async (forcePrompt = false) => {
 
   throw new Error("No se pudo obtener el token de acceso de Google para Gmail.");
 };
+
+// Obtiene o solicita un token OAuth específico para Google Contacts (People API)
+export const getOrRequestContactsAccessToken = async (forcePrompt = false) => {
+  if (cachedContactsAccessToken && !forcePrompt) {
+    return cachedContactsAccessToken;
+  }
+
+  // 1. Intentar primero con Google Identity Services (GIS)
+  if (typeof window !== "undefined" && window.google?.accounts?.oauth2) {
+    try {
+      const token = await new Promise((resolve, reject) => {
+        try {
+          const client = window.google.accounts.oauth2.initTokenClient({
+            client_id: firebaseAppletConfig.oAuthClientId,
+            scope: "https://www.googleapis.com/auth/contacts",
+            hint: auth.currentUser?.email || undefined,
+            callback: (resp) => {
+              if (resp && resp.access_token) {
+                resolve(resp.access_token);
+              } else if (resp?.error) {
+                reject(new Error(resp.error_description || resp.error));
+              } else {
+                reject(new Error("No se obtuvo token de acceso de Google Contacts"));
+              }
+            },
+            error_callback: (err) => {
+              reject(err);
+            },
+          });
+          client.requestAccessToken({ prompt: forcePrompt ? "consent" : "" });
+        } catch (initErr) {
+          reject(initErr);
+        }
+      });
+
+      if (token) {
+        cachedContactsAccessToken = token;
+        return token;
+      }
+    } catch (gisErr) {
+      console.warn("GIS Contacts falló, intentando con popup de Firebase:", gisErr);
+    }
+  }
+
+  // 2. Intentar con Firebase Auth en el workspaceApp provisionado
+  try {
+    const result = await signInWithPopup(workspaceAuth, workspaceContactsProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedContactsAccessToken = credential.accessToken;
+      return cachedContactsAccessToken;
+    }
+  } catch (workspaceErr) {
+    console.warn("workspaceAuth signInWithPopup para Contacts falló:", workspaceErr);
+    try {
+      const fallbackResult = await signInWithPopup(auth, workspaceContactsProvider);
+      const fallbackCred = GoogleAuthProvider.credentialFromResult(fallbackResult);
+      if (fallbackCred?.accessToken) {
+        cachedContactsAccessToken = fallbackCred.accessToken;
+        return cachedContactsAccessToken;
+      }
+    } catch (fbErr) {
+      console.error("Fallo al solicitar autorización para Google Contacts:", fbErr);
+    }
+    throw workspaceErr;
+  }
+
+  throw new Error("No se pudo obtener el token de acceso para Google Contacts.");
+};
+

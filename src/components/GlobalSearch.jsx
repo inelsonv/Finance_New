@@ -17,6 +17,7 @@ import {
   Briefcase,
   Compass,
   Stethoscope,
+  BookUser,
 } from "lucide-react";
 
 // Módulos/secciones navegables de la app, para que buscar "préstamo" también
@@ -50,6 +51,7 @@ const MODULOS = [
   { nombre: "Catálogo", tab: "catalogo" },
   { nombre: "Órdenes de compra", tab: "ordenes-compra" },
   { nombre: "Entidades", tab: "entidades" },
+  { nombre: "Contactos", tab: "contactos" },
   { nombre: "Salud y Chequeos", tab: "salud" },
   { nombre: "Salud y Hábitos", tab: "habitos" },
   { nombre: "Configuración", tab: "configuracion" },
@@ -59,6 +61,7 @@ const MODULOS = [
 export default function GlobalSearch({
   products,
   entidades,
+  contactos = [],
   prestamos,
   tarjetas,
   membresias,
@@ -117,6 +120,7 @@ export default function GlobalSearch({
       for (const o of ordenesCompra || []) items.push({ id: o.id, tipo: "Orden de compra", icon: ClipboardList, nombre: o.folio, subtitulo: o.estado, tab: "ordenes-compra" });
     }
     for (const e of entidades || []) items.push({ id: e.docId, tipo: "Entidad", icon: Landmark, nombre: e.name, subtitulo: e.type, tab: "entidades" });
+    for (const c of contactos || []) items.push({ id: c.id, tipo: "Contacto", icon: BookUser, nombre: c.nombre, subtitulo: [c.especialidad, c.organizacion, c.telefono].filter(Boolean).join(" · "), tab: "contactos" });
     for (const p of prestamos || []) items.push({ id: p.id, tipo: "Préstamo", icon: Banknote, nombre: `${p.numero} · ${p.entidadName || ""}`, subtitulo: p.tipo, tab: "prestamos" });
     for (const t of tarjetas || []) items.push({ id: t.id, tipo: "Tarjeta", icon: CreditCard, nombre: t.nombre, subtitulo: t.entidadName, tab: "tarjetas" });
     for (const m of membresias || []) items.push({ id: m.id, tipo: "Membresía", icon: Ticket, nombre: m.nombre, subtitulo: m.entidadName, tab: "membresias" });
@@ -131,7 +135,7 @@ export default function GlobalSearch({
     for (const c of saludControles || []) items.push({ id: c.id, tipo: "Control de salud", icon: Stethoscope, nombre: c.titulo, subtitulo: [c.area, c.especialidad, c.medicoNombre].filter(Boolean).join(" · "), tab: "salud" });
     for (const ind of saludIndicadores || []) items.push({ id: ind.id, tipo: "Indicador de salud", icon: Stethoscope, nombre: ind.nombre, subtitulo: `${ind.valorSecundario != null ? `${ind.valor}/${ind.valorSecundario}` : ind.valor} ${ind.unidad || ""}`.trim(), tab: "salud" });
     return items;
-  }, [products, entidades, prestamos, tarjetas, membresias, contratos, cuentas, activos, seguros, eventos, ordenesCompra, metasAhorro, fuentesIngreso, saludMedicos, saludControles, saludIndicadores, isOwner]);
+  }, [products, entidades, contactos, prestamos, tarjetas, membresias, contratos, cuentas, activos, seguros, eventos, ordenesCompra, metasAhorro, fuentesIngreso, saludMedicos, saludControles, saludIndicadores, isOwner]);
 
   const resultados = useMemo(() => {
     const q = normalizar(query.trim());

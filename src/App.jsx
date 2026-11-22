@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
-import { auth, ALLOWED_EMAIL, isOwnerUser, setCachedAccessToken, clearCachedAccessToken } from "./firebase";
-import { watchProducts, watchList, watchEntidades, watchConnectionStatus, watchMovimientos, watchPrestamos, watchCuentas, watchTarjetas, watchMembresias, watchFuentesIngreso, watchCategoriasGasto, watchPresupuestoAnual, watchContratos, watchFlujo, watchTiposEntidad, watchCalendario, watchActivos, watchMantenimientos, watchMetasAhorro, watchSeguros, watchHistorialCompras, watchOrdenesCompra, watchVacaciones, watchDiezmoConfig, watchAhorroAutoConfig, watchRenovaciones, watchPuntos, watchPuntosHistorial, watchChecklistTodos, watchCategoriasPuntosConfig, watchIngresosPuntuales, evaluarCumplimientoQuincena, watchTopesAjusteConfig, evaluarAjustesPresupuesto, watchAjustesPresupuestoHistorial, evaluarInteresYMoraTarjeta, watchComprasProrateadas, evaluarExcedenteQuincena, watchSugerenciasInversion, watchDiasCobroConfig, watchHabitos, watchHabitosRegistro, evaluarPenalizacionHabito, watchHabitosPenalizaciones, evaluarVersiculoDiario, watchVersiculoHoy, setCurrentDbUser, inicializarEspacioUsuarioNuevo, watchUsuariosRegistrados, saveUserThemePreference, getUserThemePreference, watchPlanSuscripcion, sincronizarEstadoDuoUsuario, getDuoTitularEmail, setDuoSharedMemberStatus } from "./lib/db";
+import { auth, ALLOWED_EMAIL, isOwnerUser, setCachedAccessToken, clearCachedAccessToken, clearCachedGmailAccessToken, clearCachedContactsAccessToken } from "./firebase";
+import { watchProducts, watchList, watchEntidades, watchContactos, watchConnectionStatus, watchMovimientos, watchPrestamos, watchCuentas, watchTarjetas, watchMembresias, watchFuentesIngreso, watchCategoriasGasto, watchPresupuestoAnual, watchContratos, watchFlujo, watchTiposEntidad, watchCalendario, watchActivos, watchMantenimientos, watchMetasAhorro, watchSeguros, watchHistorialCompras, watchOrdenesCompra, watchVacaciones, watchDiezmoConfig, watchAhorroAutoConfig, watchRenovaciones, watchPuntos, watchPuntosHistorial, watchChecklistTodos, watchCategoriasPuntosConfig, watchIngresosPuntuales, evaluarCumplimientoQuincena, watchTopesAjusteConfig, evaluarAjustesPresupuesto, watchAjustesPresupuestoHistorial, evaluarInteresYMoraTarjeta, watchComprasProrateadas, evaluarExcedenteQuincena, watchSugerenciasInversion, watchDiasCobroConfig, watchHabitos, watchHabitosRegistro, evaluarPenalizacionHabito, watchHabitosPenalizaciones, evaluarVersiculoDiario, watchVersiculoHoy, setCurrentDbUser, inicializarEspacioUsuarioNuevo, watchUsuariosRegistrados, saveUserThemePreference, getUserThemePreference, watchPlanSuscripcion, sincronizarEstadoDuoUsuario, getDuoTitularEmail, setDuoSharedMemberStatus } from "./lib/db";
 import { fechaHoyStr, obtenerVersiculoDelDia } from "./lib/versiculos";
 import { obtenerConsejoDelDia } from "./lib/consejosFinancieros";
 import { lanzarMonedasHaciaTrofeo } from "./lib/monedaVolando";
@@ -31,6 +31,7 @@ import Finanzas from "./components/Finanzas.jsx";
 import PagosFijos from "./components/PagosFijos.jsx";
 import Vacaciones from "./components/Vacaciones.jsx";
 import Entidades from "./components/Entidades.jsx";
+import Contactos from "./components/Contactos.jsx";
 import Movimientos from "./components/Movimientos.jsx";
 import Prestamos from "./components/Prestamos.jsx";
 import Cuentas from "./components/Cuentas.jsx";
@@ -84,6 +85,7 @@ const TITLES = {
   "dinero-cuentas": "Finanzas",
   "deudas-pagos": "Pagos fijos",
   entidades: "Entidades",
+  contactos: "Contactos",
   cuentas: "Cuentas",
   prestamos: "Préstamos",
   tarjetas: "Tarjetas",
@@ -209,6 +211,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [list, setList] = useState([]);
   const [entidades, setEntidades] = useState([]);
+  const [contactos, setContactos] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const [prestamos, setPrestamos] = useState([]);
   const [cuentas, setCuentas] = useState([]);
@@ -439,6 +442,7 @@ export default function App() {
     setProducts([]);
     setList([]);
     setEntidades([]);
+    setContactos([]);
     setMovimientos([]);
     setPrestamos([]);
     setCuentas([]);
@@ -484,6 +488,8 @@ export default function App() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         clearCachedAccessToken();
+        clearCachedGmailAccessToken();
+        clearCachedContactsAccessToken();
         setCurrentDbUser(null);
         setDuoSharedMemberStatus(false);
         setDuoInfo({ esDuo: false, titularEmail: null });
@@ -572,6 +578,7 @@ export default function App() {
     }, handleError);
     const unsubList = watchList(setList, handleError);
     const unsubEntidades = watchEntidades(setEntidades, handleError);
+    const unsubContactos = watchContactos(setContactos, handleError);
     const unsubMovimientos = watchMovimientos(setMovimientos, handleError);
     const unsubPrestamos = watchPrestamos(setPrestamos, handleError);
     const unsubCuentas = watchCuentas(setCuentas, handleError);
@@ -652,6 +659,7 @@ export default function App() {
       unsubProducts();
       unsubList();
       unsubEntidades();
+      unsubContactos();
       unsubMovimientos();
       unsubPrestamos();
       unsubCuentas();
@@ -1092,9 +1100,15 @@ export default function App() {
                   {entidades.length} entidad{entidades.length !== 1 ? "es" : ""} registrada{entidades.length !== 1 ? "s" : ""}
                 </span>
               )}
+              {tab === "contactos" && (
+                <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+                  {contactos.length} contacto{contactos.length !== 1 ? "s" : ""}
+                </span>
+              )}
               <GlobalSearch
                 products={products}
                 entidades={entidades}
+                contactos={contactos}
                 prestamos={prestamos}
                 tarjetas={tarjetas}
                 membresias={membresias}
@@ -1391,6 +1405,7 @@ export default function App() {
           />
         )}
         {tab === "entidades" && <Entidades entidades={entidades} tiposPersonalizados={tiposEntidad} />}
+        {tab === "contactos" && <Contactos contactos={contactos} />}
         {tab === "movimientos" && (
           <Movimientos
             movimientos={movimientos}

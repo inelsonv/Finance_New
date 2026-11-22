@@ -27,6 +27,7 @@ import {
   Stethoscope,
   ChevronsLeft,
   ChevronsRight,
+  BookUser,
 } from "lucide-react";
 import SmartFinanceLogo, { SmartFinanceMark } from "./SmartFinanceLogo.jsx";
 
@@ -91,6 +92,7 @@ const NAV_ITEMS = [
     ],
   },
   { id: "entidades", label: "Entidades", icon: Landmark },
+  { id: "contactos", label: "Contactos", icon: BookUser },
   { id: "wallet", label: "Wallet", icon: WalletIcon },
   { id: "salud", label: "Salud y Chequeos", icon: Stethoscope },
   { id: "habitos", label: "Salud y Hábitos", icon: HeartPulse },

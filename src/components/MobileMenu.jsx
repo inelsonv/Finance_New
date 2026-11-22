@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Home, ArrowLeftRight, Wallet, Banknote, Car, Landmark, Settings, LogOut, Coins, WalletCards, HeartPulse, Stethoscope, Bot, Map as MapIcon, UtensilsCrossed, CheckSquare, Target, Route } from "lucide-react";
+import { X, Home, ArrowLeftRight, Wallet, Banknote, Car, Landmark, Settings, LogOut, Coins, WalletCards, HeartPulse, Stethoscope, Bot, Map as MapIcon, UtensilsCrossed, CheckSquare, Target, Route, BookUser } from "lucide-react";
 import { confirm } from "../lib/confirm";
 import SmartFinanceLogo from "./SmartFinanceLogo.jsx";
 
@@ -16,6 +16,7 @@ const OPCIONES = [
   { id: "deudas-pagos", label: "Pagos fijos", icon: Banknote },
   { id: "activos", label: "Activos", icon: Car },
   { id: "entidades", label: "Entidades", icon: Landmark },
+  { id: "contactos", label: "Contactos", icon: BookUser },
   { id: "wallet", label: "Wallet", icon: WalletCards },
   { id: "salud", label: "Salud y Chequeos", icon: Stethoscope },
   { id: "habitos", label: "Salud y Hábitos", icon: HeartPulse },

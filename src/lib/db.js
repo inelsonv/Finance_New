@@ -5108,3 +5108,115 @@ export async function eliminarCuentaUsuario(user) {
   }
 }
 
+// ---- Contactos y Sincronización con Google Contacts ----
+export function watchContactos(onChange, onError) {
+  return onSnapshot(
+    collection(db, "contactos"),
+    (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => {
+        if (Boolean(a.favorito) !== Boolean(b.favorito)) return a.favorito ? -1 : 1;
+        return (a.nombre || "").localeCompare(b.nombre || "");
+      });
+      onChange(docs);
+    },
+    (err) => onError && onError(err)
+  );
+}
+
+export async function addContacto(data) {
+  const nombre = (data?.nombre || "").trim();
+  if (!nombre) throw new Error("Ingresa el nombre del contacto o consultorio");
+  const docRef = await addDoc(collection(db, "contactos"), {
+    nombre,
+    categoria: data.categoria || "Personal",
+    especialidad: (data.especialidad || "").trim(),
+    organizacion: (data.organizacion || "").trim(),
+    telefono: (data.telefono || "").trim(),
+    email: (data.email || "").trim(),
+    direccion: (data.direccion || "").trim(),
+    horario: (data.horario || "").trim(),
+    notas: (data.notas || "").trim(),
+    fotoUrl: data.fotoUrl || "",
+    favorito: Boolean(data.favorito),
+    googleResourceName: data.googleResourceName || null,
+    googleEtag: data.googleEtag || null,
+    sincronizadoGoogleEn: data.googleResourceName ? new Date().toISOString() : null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateContacto(id, fields) {
+  await updateDoc(doc(db, "contactos", id), {
+    ...fields,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteContacto(id) {
+  await deleteDoc(doc(db, "contactos", id));
+}
+
+export async function syncGoogleContactsToLocal(googleContacts, existingContactos = []) {
+  const byResource = new Map();
+  const byFallbackKey = new Map();
+
+  for (const c of existingContactos) {
+    if (c.googleResourceName) byResource.set(c.googleResourceName, c);
+    const key = `${(c.nombre || "").trim().toLowerCase()}|${(c.telefono || "").replace(/\D/g, "")}`;
+    if (c.nombre) byFallbackKey.set(key, c);
+  }
+
+  let creados = 0;
+  let actualizados = 0;
+
+  for (const gc of googleContacts) {
+    const key = `${(gc.nombre || "").trim().toLowerCase()}|${(gc.telefono || "").replace(/\D/g, "")}`;
+    const existing =
+      (gc.googleResourceName && byResource.get(gc.googleResourceName)) ||
+      byFallbackKey.get(key) ||
+      null;
+
+    if (existing) {
+      await updateDoc(doc(db, "contactos", existing.id), {
+        nombre: gc.nombre || existing.nombre,
+        telefono: gc.telefono || existing.telefono || "",
+        email: gc.email || existing.email || "",
+        organizacion: gc.organizacion || existing.organizacion || "",
+        especialidad: gc.especialidad || existing.especialidad || "",
+        direccion: gc.direccion || existing.direccion || "",
+        notas: existing.notas || gc.notas || "",
+        fotoUrl: gc.fotoUrl || existing.fotoUrl || "",
+        googleResourceName: gc.googleResourceName || existing.googleResourceName || null,
+        googleEtag: gc.googleEtag || existing.googleEtag || null,
+        sincronizadoGoogleEn: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+      actualizados += 1;
+    } else {
+      await addDoc(collection(db, "contactos"), {
+        nombre: gc.nombre,
+        categoria: gc.categoria || "Personal",
+        especialidad: gc.especialidad || "",
+        organizacion: gc.organizacion || "",
+        telefono: gc.telefono || "",
+        email: gc.email || "",
+        direccion: gc.direccion || "",
+        horario: "",
+        notas: gc.notas || "",
+        fotoUrl: gc.fotoUrl || "",
+        favorito: false,
+        googleResourceName: gc.googleResourceName || null,
+        googleEtag: gc.googleEtag || null,
+        sincronizadoGoogleEn: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      creados += 1;
+    }
+  }
+
+  return { creados, actualizados };
+}
